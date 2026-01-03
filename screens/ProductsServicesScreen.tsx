@@ -13,11 +13,9 @@ import {
     Modal,
     Image,
     Switch,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     Dimensions,
-    StatusBar,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -81,6 +79,42 @@ const DetailRow = ({ icon, label, value, theme }: any) => (
     </View>
 );
 
+// --- Custom Alert Modal ---
+const CustomAlert = ({ visible, title, message, buttons, onClose, theme }: any) => (
+    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+        <View style={[styles.modalOverlay, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+            <View style={[styles.customAlertContainer, { backgroundColor: theme.cardBackground }]}>
+                {title && <Text style={[styles.customAlertTitle, { color: theme.text }]}>{title}</Text>}
+                {message && <Text style={[styles.customAlertMessage, { color: theme.subText }]}>{message}</Text>}
+
+                <View style={[styles.customAlertButtonsContainer]}>
+                    {buttons.map((btn: any, index: number) => (
+                        <TouchableOpacity
+                            key={index}
+                            style={[
+                                styles.customAlertButton,
+                                // Dynamic background for different styles
+                                { backgroundColor: btn.style === 'destructive' ? '#FFE5E5' : (btn.style === 'cancel' ? theme.background : theme.background) },
+                                index > 0 && { marginTop: 8 }
+                            ]}
+                            onPress={() => {
+                                if (btn.onPress) btn.onPress();
+                                else onClose();
+                            }}>
+                            <Text style={[
+                                styles.customAlertButtonText,
+                                { color: btn.style === 'destructive' ? '#FF3B30' : (btn.style === 'cancel' ? theme.subText : '#007AFF'), fontWeight: btn.style === 'cancel' ? '600' : 'bold' }
+                            ]}>
+                                {btn.text}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+        </View>
+    </Modal>
+);
+
 export function ProductsServicesScreen() {
     const { theme } = useTheme();
 
@@ -96,6 +130,10 @@ export function ProductsServicesScreen() {
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<'all' | 'services' | 'products'>('all');
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+    // Custom Alert State
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertConfig, setAlertConfig] = useState({ title: '', message: '', buttons: [] as any[] });
 
     const initialFormState: Partial<Service> = {
         name: '',
@@ -121,6 +159,15 @@ export function ProductsServicesScreen() {
 
     // --- Actions ---
 
+    const showAlert = (title: string, message: string, buttons: any[]) => {
+        setAlertConfig({ title, message, buttons });
+        setAlertVisible(true);
+    };
+
+    const closeAlert = () => {
+        setAlertVisible(false);
+    };
+
     const switchFormType = (type: 'service' | 'product') => {
         if (newItem.category !== type) {
             setNewItem({
@@ -135,7 +182,7 @@ export function ProductsServicesScreen() {
     const handleImagePick = async () => {
         const currentImages = newItem.images || [];
         if (currentImages.length >= 4) {
-            Alert.alert('Limit Reached', 'You can upload a maximum of 4 images.');
+            showAlert('Limit Reached', 'You can upload a maximum of 4 images.', [{ text: 'OK', onPress: closeAlert }]);
             return;
         }
 
@@ -191,12 +238,12 @@ export function ProductsServicesScreen() {
         }
 
         if (missingFields.length > 0) {
-            Alert.alert('Missing Fields', `Please fill the following required fields:\n\n${missingFields.join('\n')}`);
+            showAlert('Missing Fields', `Please fill the following required fields:\n\n${missingFields.join('\n')}`, [{ text: 'OK', onPress: closeAlert }]);
             return false;
         }
 
         if (invalidFields.length > 0) {
-            Alert.alert('Invalid Input', `Please correct the following errors:\n\n${invalidFields.join('\n')}`);
+            showAlert('Invalid Input', `Please correct the following errors:\n\n${invalidFields.join('\n')}`, [{ text: 'OK', onPress: closeAlert }]);
             return false;
         }
 
@@ -237,17 +284,22 @@ export function ProductsServicesScreen() {
     };
 
     const handleDelete = (id: string, fromDetail: boolean = false) => {
-        Alert.alert('Delete Item', 'Are you sure you want to delete this item?', [
-            { text: 'Cancel', style: 'cancel' },
-            {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                    setItems(items.filter(i => i.id !== id));
-                    if (fromDetail) setShowDetailModal(false);
+        if (fromDetail) setShowDetailModal(false);
+
+        // Slight delay to allow modal transition if any
+        setTimeout(() => {
+            showAlert('Delete Item', 'Are you sure you want to delete this item?', [
+                { text: 'Cancel', style: 'cancel', onPress: () => { if (fromDetail) setShowDetailModal(true); closeAlert(); } },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => {
+                        setItems(items.filter(i => i.id !== id));
+                        closeAlert();
+                    }
                 }
-            }
-        ]);
+            ]);
+        }, 100);
     };
 
     const openAddModal = () => {
@@ -568,6 +620,16 @@ export function ProductsServicesScreen() {
                     )}
                 </View>
             </Modal>
+
+            {/* Custom Alert Modal */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                buttons={alertConfig.buttons}
+                onClose={closeAlert}
+                theme={theme}
+            />
         </View>
     );
 }
@@ -635,4 +697,11 @@ const styles = StyleSheet.create({
     detailLabel: { fontSize: 14, fontWeight: '600' },
     detailValue: { fontSize: 14, fontWeight: '500', flex: 1, textAlign: 'right' },
     detailActions: { flexDirection: 'row', gap: 12, paddingTop: 20, borderTopWidth: 1 },
+    // Custom Alert Styles
+    customAlertContainer: { width: '85%', borderRadius: 16, padding: 20, alignItems: 'center' },
+    customAlertTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+    customAlertMessage: { fontSize: 14, marginBottom: 20, textAlign: 'center' },
+    customAlertButtonsContainer: { width: '100%' },
+    customAlertButton: { paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    customAlertButtonText: { fontSize: 16 },
 });
