@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   Switch,
   ImageSourcePropType,
+  ActivityIndicator,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -25,8 +26,7 @@ import {
 } from 'react-native-safe-area-context';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { AuthScreen } from './AuthScreen';
-
-// --- Theme System ---
+import { TechnicianDashboard } from './TechnicianDashboard';
 
 const lightTheme = {
   mode: 'light',
@@ -69,24 +69,27 @@ export const ThemeContext = createContext({
 export function useTheme() {
   return useContext(ThemeContext);
 }
-
-// --- App Root ---
-
 function App(): React.JSX.Element {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLanguageSelected, setIsLanguageSelected] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkLanguageSelection();
+    initializeApp();
   }, []);
 
-  const checkLanguageSelection = async () => {
+  const initializeApp = async () => {
     try {
       const selected = await AsyncStorage.getItem('has-selected-language');
       setIsLanguageSelected(selected === 'true');
+      const userData = await AsyncStorage.getItem('user_data');
+      setIsAuthenticated(!!userData);
     } catch (error) {
       setIsLanguageSelected(false);
+      setIsAuthenticated(false);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -96,10 +99,13 @@ function App(): React.JSX.Element {
 
   const theme = isDarkMode ? darkTheme : lightTheme;
 
-  if (isLanguageSelected === null) {
-    return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
-  }
-
+  if (loading || isLanguageSelected === null) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+      <ActivityIndicator size="large" color="#F4C430" /> 
+    </View>
+  );
+}
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, isDarkMode }}>
       <SafeAreaProvider>
@@ -110,7 +116,7 @@ function App(): React.JSX.Element {
         {!isLanguageSelected ? (
           <LanguageScreen onSelect={() => setIsLanguageSelected(true)} />
         ) : isAuthenticated ? (
-          <MainApp />
+          <TechnicianDashboard onLogout={() => setIsAuthenticated(false)} />
         ) : (
           <AuthScreen onLogin={() => setIsAuthenticated(true)} />
         )}
@@ -119,6 +125,7 @@ function App(): React.JSX.Element {
   );
 }
 
+
 function MainApp() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('Home');
@@ -126,7 +133,6 @@ function MainApp() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: theme.background }]}>
-      {/* Content Area */}
       <View style={styles.contentContainer}>
         {activeTab === 'Home' && <HomeScreen />}
         {activeTab === 'Find' && <FindScreen />}
@@ -134,7 +140,6 @@ function MainApp() {
         {activeTab === 'Settings' && <SettingsScreen />}
       </View>
 
-      {/* Bottom Navigation */}
       <BottomTabs
         paddingBottom={insets.bottom > 0 ? insets.bottom : 20}
         activeTab={activeTab}
@@ -144,8 +149,6 @@ function MainApp() {
   );
 }
 
-// --- Screens ---
-
 function HomeScreen() {
   const { theme } = useTheme();
 
@@ -154,7 +157,6 @@ function HomeScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: 100 }}>
 
-      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatarContainer}>
@@ -174,8 +176,6 @@ function HomeScreen() {
           <View style={[styles.notificationDot, { borderColor: theme.cardBackground }]} />
         </TouchableOpacity>
       </View>
-
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={[styles.searchBar, { backgroundColor: theme.inputBackground }]}>
           <Text style={styles.searchIcon}>🔍</Text>
@@ -189,8 +189,6 @@ function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Filter Certified Section */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>FILTER Certified</Text>
@@ -205,7 +203,6 @@ function HomeScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.horizontalScrollPadding}>
-        {/* Card 1 */}
         <WorkshopCard
           image={require('./assets/car_workshop.png')}
           title="AutoFix Pro Center"
@@ -215,8 +212,6 @@ function HomeScreen() {
           tags={['Diagnostics', 'Quick Service']}
           isSponsored={true}
         />
-
-        {/* Card 2 */}
         <WorkshopCard
           image={require('./assets/tires_wheel.png')}
           title="Turbo Mechanics"
@@ -227,8 +222,6 @@ function HomeScreen() {
           isSponsored={true}
         />
       </ScrollView>
-
-      {/* My Favorites Section */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>My Favorites</Text>
         <TouchableOpacity>
@@ -253,8 +246,6 @@ function HomeScreen() {
           tag="Oil Change"
         />
       </ScrollView>
-
-      {/* Emergency Section */}
       <View style={styles.emergencyContainer}>
         <View style={styles.emergencyContent}>
           <Text style={styles.emergencyTitle}>Need Emergency Help?</Text>
@@ -421,8 +412,6 @@ function SettingsScreen() {
             />
           </View>
         </View>
-
-        {/* Account Section */}
         <Text style={[styles.settingsHeader, { color: theme.subText, marginTop: 24 }]}>ACCOUNT</Text>
 
         <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
@@ -432,8 +421,6 @@ function SettingsScreen() {
           <View style={[styles.divider, { backgroundColor: theme.border }]} />
           <SettingsItem icon="bell" label="Notifications" />
         </View>
-
-        {/* More Section */}
         <Text style={[styles.settingsHeader, { color: theme.subText, marginTop: 24 }]}>MORE</Text>
 
         <View style={[styles.settingsCard, { backgroundColor: theme.cardBackground }]}>
@@ -446,9 +433,6 @@ function SettingsScreen() {
     </ScrollView>
   );
 }
-
-// --- Components ---
-
 function WorkshopCard({ image, title, rating, distance, location, tags, isSponsored, isNew, fullWidth }: any) {
   const { theme } = useTheme();
   return (
@@ -732,7 +716,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   verifiedBadge: {
-    color: '#007AFF', // Blue check
+    color: '#007AFF', 
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -858,7 +842,6 @@ const styles = StyleSheet.create({
     color: '#2ECC71',
   },
 
-  // Mini Card
   miniCard: {
     width: 260,
     borderRadius: 16,
@@ -921,8 +904,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#F4C430',
   },
-
-  // Emergency Section
   emergencyContainer: {
     marginHorizontal: 20,
     marginTop: 10,
@@ -973,8 +954,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-
-  // Orders Styling
   orderCard: {
     flexDirection: 'row',
     borderRadius: 16,
@@ -1026,8 +1005,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-
-  // Settings Styling
   settingsHeader: {
     fontSize: 12,
     fontWeight: '600',
@@ -1071,8 +1048,6 @@ const styles = StyleSheet.create({
     height: 1,
     marginLeft: 60,
   },
-
-  // Bottom Navigation
   bottomNavContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',

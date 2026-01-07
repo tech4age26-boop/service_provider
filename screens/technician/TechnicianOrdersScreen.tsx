@@ -13,9 +13,10 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../App';
-
-export function TechnicianOrdersScreen() {
+import { useTheme } from '../../App';
+import AppBody from '../../components/app_body/app-body';
+import TechnicianHeader  from '../../components/technician_header/technician-header';
+export function TechnicianOrdersScreen({navigation}: any) {
     const { theme } = useTheme();
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
@@ -31,12 +32,12 @@ export function TechnicianOrdersScreen() {
     ];
 
     return (
+        <AppBody> 
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
+            {/* <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
                 <Text style={[styles.title, { color: theme.text }]}>{t('technician.jobs_title')}</Text>
-            </View>
-
-            {/* Tabs */}
+            </View> */}
+            <TechnicianHeader title={t('technician.jobs_title')} onBackPress={() => {}} />
             <View style={[styles.tabContainer, { backgroundColor: theme.cardBackground }]}>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
@@ -62,11 +63,10 @@ export function TechnicianOrdersScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Orders List */}
             <ScrollView style={styles.content}>
                 {activeTab === 'pending' ? (
                     pendingOrders.map((order) => (
-                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
+                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} onPress={()=>navigation.navigate('TaskDetailScreen', { task: order } )}>
                             <View style={styles.orderHeader}>
                                 <Text style={[styles.orderService, { color: theme.text }]}>{order.service}</Text>
                                 <View style={[styles.statusBadge, { backgroundColor: order.statusColor + '20' }]}>
@@ -91,7 +91,7 @@ export function TechnicianOrdersScreen() {
 
                 ) : (
                     completedOrders.map((order) => (
-                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
+                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} onPress={()=>navigation.navigate('TaskDetailScreen', { task: order } )}>
                             <View style={styles.orderHeader}>
                                 <Text style={[styles.orderService, { color: theme.text }]}>{order.service}</Text>
                                 <Text style={styles.orderAmount}>{order.amount}</Text>
@@ -109,6 +109,7 @@ export function TechnicianOrdersScreen() {
                 )}
             </ScrollView>
         </View>
+        </AppBody>
     );
 }
 
@@ -117,15 +118,15 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#F8F9FA',
     },
-    header: {
-        padding: 20,
-        backgroundColor: '#FFFFFF',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1C1C1E',
-    },
+    // header: {
+    //     padding: 20,
+    //     backgroundColor: '#FFFFFF',
+    // },
+    // title: {
+    //     fontSize: 24,
+    //     fontWeight: 'bold',
+    //     color: '#1C1C1E',
+    // },
     tabContainer: {
         flexDirection: 'row',
         backgroundColor: '#FFFFFF',

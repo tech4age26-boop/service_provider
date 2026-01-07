@@ -14,7 +14,9 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../App';
+import { useTheme } from '../../App';
+import AppBody from '../../components/app_body/app-body';
+import TechnicianHeader from '../../components/technician_header/technician-header';
 
 interface TechnicianSettingsScreenProps {
     onLogout?: () => void;
@@ -38,12 +40,14 @@ export function TechnicianSettingsScreen({ onLogout }: TechnicianSettingsScreenP
     };
 
     return (
+        <AppBody>
         <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
+            {/* <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
                 <Text style={[styles.title, { color: theme.text }]}>{t('settings.settings_title')}</Text>
-            </View>
+            </View> */}
+            <TechnicianHeader title={t('settings.settings_title')}  />
 
-            {/* Profile Section */}
+
             <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
                 <Text style={styles.sectionTitle}>{t('settings.work_status')}</Text>
                 <View style={styles.settingItem}>
@@ -118,6 +122,7 @@ export function TechnicianSettingsScreen({ onLogout }: TechnicianSettingsScreenP
 
             <View style={{ height: 40 }} />
         </ScrollView>
+        </AppBody>
     );
 }
 

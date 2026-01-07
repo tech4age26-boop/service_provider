@@ -156,7 +156,7 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
             formData.append('services', JSON.stringify(selectedServices));
 
             if (registrationType === 'workshop') {
-                console.log('Validating Workshop Data:', { workshopName, fullName, crNumber, vatNumber, hasLogo: !!logo, hasLocation: !!location });
+                console.log('Validating Workshop Data:', { workshopName, fullName, crNumber, vatNumber, hasLocation: !!location });
 
                 if (!workshopName || !fullName || !crNumber || !vatNumber || !logo || !location) {
                     Alert.alert('Error', 'Please fill all fields (including Owner Name), select an address, and upload a logo');
