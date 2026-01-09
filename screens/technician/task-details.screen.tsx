@@ -7,26 +7,60 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
-import { useTheme } from '../../App';
+import { useTheme } from '../../theme/ThemeContext';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppBody from '../../components/app_body/app-body';
 import TechnicianHeader from '../../components/technician_header/technician-header';
 
+interface Task {
+  id: string;
+  service: string;
+  customer: string;
+  location: string;
+  eta?: string;
+  scheduled?: string;
+  status: 'active' | 'next' | 'completed';
+}
+
+interface RouteParams {
+  task: Task;
+}
+
 interface TaskDetailProps {
-  route: any;
+  route: {
+    params: RouteParams;
+  };
   navigation: any;
 }
 
 export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
   const { theme } = useTheme();
-  const task = route.params.task;
+  const task = route?.params?.task;
+
+  // Safety check for task data
+  if (!task) {
+    return (
+      <AppBody style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontSize: 16, color: theme.text }}>Task not found</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
+          <Text style={{ color: '#007AFF' }}>Go Back</Text>
+        </TouchableOpacity>
+      </AppBody>
+    );
+  }
 
   const openMaps = () => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-      task.location
-    )}`;
-    Linking.openURL(url);
+    try {
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+        task.location
+      )}`;
+      Linking.openURL(url).catch((err) => {
+        console.error('Failed to open maps:', err);
+      });
+    } catch (error) {
+      console.error('Error opening maps:', error);
+    }
   };
 
   // Demo customer review data
@@ -46,9 +80,9 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
           Task Details
         </Text>
         <View style={{ width: 22 }} /> 
-      </View> */} 
+      </View> */}
 
-      <TechnicianHeader title="Task Details" onBackPress={() => {navigation.goBack()}} />
+      <TechnicianHeader title="Task Details" onBackPress={() => { navigation.goBack() }} />
 
       <ScrollView style={styles.content}>
         {/* Task Info */}
@@ -58,11 +92,11 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
               {task.service}
             </Text>
             <View style={[
-              styles.statusBadge, 
+              styles.statusBadge,
               { backgroundColor: task.status === 'completed' ? '#D4EDDA' : task.status === 'next' ? '#D1ECF1' : '#FFF3CD' }
             ]}>
               <Text style={[
-                styles.statusText, 
+                styles.statusText,
                 { color: task.status === 'completed' ? '#155724' : task.status === 'next' ? '#0C5460' : '#856404' }
               ]}>
                 {task.status === 'completed' ? 'Completed' : task.status === 'next' ? 'Next Task' : 'Active'}
@@ -164,7 +198,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold' as const },
   content: { flex: 1 },
   card: {
     borderRadius: 16,
@@ -177,20 +211,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  taskTitle: { fontSize: 18, fontWeight: 'bold' },
+  taskTitle: { fontSize: 18, fontWeight: 'bold' as const },
   statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 12, fontWeight: '600' },
+  statusText: { fontSize: 12, fontWeight: '600' as const },
   infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
   infoText: { fontSize: 14 },
   mapButton: { flexDirection: 'row', backgroundColor: '#007AFF', padding: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  mapButtonText: { color: '#FFF', fontWeight: '600', marginLeft: 8 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12 },
+  mapButtonText: { color: '#FFF', fontWeight: '600' as const, marginLeft: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold' as const, marginBottom: 12 },
   checklistItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
   checkText: { fontSize: 14 },
   reviewRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 4 },
-  reviewRating: { fontSize: 14, fontWeight: '600' },
+  reviewRating: { fontSize: 14, fontWeight: '600' as const },
   reviewComment: { fontSize: 14, fontStyle: 'italic' },
   actionContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 12 },
   actionButton: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', marginHorizontal: 4 },
-  actionButtonText: { color: '#1C1C1E', fontWeight: '600' },
+  actionButtonText: { color: '#1C1C1E', fontWeight: '600' as const },
 });

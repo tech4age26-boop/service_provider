@@ -7,13 +7,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
-import { ProviderHomeScreen } from './screens/ProviderHomeScreen';
-import { ProviderEmployeesScreen } from './screens/ProviderEmployeesScreen';
-import { ProviderOrdersScreen } from './screens/ProviderOrdersScreen';
-import { ProductsServicesScreen } from './screens/ProductsServicesScreen';
-import { ProviderSettingsScreen } from './screens/ProviderSettingsScreen';
+import { ProviderHomeScreen } from '../screens/Provider/ProviderHomeScreen';
+import { ProviderEmployeesScreen } from '../screens/Provider/ProviderEmployeesScreen';
+import { ProviderOrdersScreen } from '../screens/Provider/ProviderOrdersScreen';
+import { ProductsServicesScreen } from '../screens/Provider/ProductsServicesScreen';
+import { SettingsStackNavigator } from '../navigation/technician/SettingsStackNavigator';
 
-import { useTheme } from './App';
+import { useTheme } from '../theme/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 
@@ -41,7 +41,7 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                         shadowOffset: { width: 0, height: -4 },
                         shadowOpacity: 0.1,
                         shadowRadius: 10,
-                        borderTopWidth: 0, // Remove default border
+                        borderTopWidth: 0,
                     },
                     tabBarLabelStyle: {
                         fontSize: 11,
@@ -98,7 +98,7 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                         ),
                     }}
                 >
-                    {(props) => <ProviderSettingsScreen {...props} onLogout={onLogout} />}
+                    {(props) => <SettingsStackNavigator {...props} onLogout={onLogout} />}
                 </Tab.Screen>
             </Tab.Navigator>
         </NavigationContainer>

@@ -15,7 +15,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../App';
+import { useTheme } from '../../theme/ThemeContext';
 
 export function ProviderHomeScreen() {
     const { theme } = useTheme();

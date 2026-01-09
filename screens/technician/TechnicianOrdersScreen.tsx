@@ -1,7 +1,3 @@
-/**
- * Technician Dashboard - Orders Screen
- */
-
 import React, { useState } from 'react';
 import {
     StyleSheet,
@@ -9,220 +5,390 @@ import {
     View,
     ScrollView,
     TouchableOpacity,
+    Linking,
+    Platform,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../App';
+import { useTheme } from '../../theme/ThemeContext';
 import AppBody from '../../components/app_body/app-body';
-import TechnicianHeader  from '../../components/technician_header/technician-header';
-export function TechnicianOrdersScreen({navigation}: any) {
+import TechnicianHeader from '../../components/technician_header/technician-header';
+import { colors } from '../../theme/colors';
+
+interface TechnicianOrder {
+    id: string;
+    service: string;
+    customer: string;
+    phone?: string;
+    location?: string;
+    vehicle: string;
+    time: string;
+    status: string;
+    statusColor: string;
+    amount?: string;
+}
+
+interface TechnicianOrdersScreenProps {
+    navigation: {
+        navigate: (screen: string, params: { task: TechnicianOrder }) => void;
+    };
+}
+
+const truncateText = (text: string, maxWords: number) => {
+    const words = text.split(' ');
+    if (words.length > maxWords) {
+        return words.slice(0, maxWords).join(' ') + '...';
+    }
+    return text;
+};
+
+export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenProps) {
     const { theme } = useTheme();
     const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending');
 
-    const pendingOrders = [
-        { id: '1', service: 'Roadside Assistance', location: 'King Fahd Rd, Riyadh', time: 'Urgent', status: 'In Transit', statusColor: '#FFA500' },
-        { id: '2', service: 'Tire Change', location: 'Takhassusi St, Riyadh', time: '11:30 AM', status: 'Pending', statusColor: '#007AFF' },
+    const pendingOrders: TechnicianOrder[] = [
+        { 
+            id: 'ORD-8821', 
+            service: t('services.oil_change'), 
+            customer: 'Khalid Mansour', 
+            phone: '+966501234567',
+            location: 'Al Olaya, Riyadh, King Fahd Road Tower B', 
+            vehicle: 'Toyota Camry 2023',
+            time: 'ASAP', 
+            status: t('status.in_transit'), 
+            statusColor: '#FF9500' 
+        },
+        { 
+            id: 'ORD-8822', 
+            service: t('services.tire_service'), 
+            customer: 'Sara Al-Otaibi', 
+            phone: '+966509876543',
+            location: 'King Fahd District, Riyadh City Center Mall', 
+            vehicle: 'Lexus RX 2022',
+            time: '11:30 AM', 
+            status: t('status.pending'), 
+            statusColor: '#007AFF' 
+        },
     ];
 
-    const completedOrders = [
-        { id: '3', service: 'Battery Jumpstart', customer: 'Ahmed Ali', time: 'Today, 9:00 AM', amount: '$45', statusColor: '#2ECC71' },
-        { id: '4', service: 'Fuel Delivery', customer: 'Sara Khan', time: 'Yesterday', amount: '$30', statusColor: '#2ECC71' },
+    const completedOrders: TechnicianOrder[] = [
+        { 
+            id: 'ORD-8790', 
+            service: t('services.battery_replacement'), 
+            customer: 'Ahmed Al-Saud', 
+            time: 'Today, 9:00 AM', 
+            amount: 'SR 450', 
+            vehicle: 'BMW X5 2021',
+            status: t('status.completed'),
+            statusColor: '#34C759' 
+        },
+        { 
+            id: 'ORD-8785', 
+            service: t('services.brake_service'), 
+            customer: 'Fahad Mohammed', 
+            time: 'Yesterday', 
+            amount: 'SR 320', 
+            vehicle: 'Honda Accord 2020',
+            status: t('status.completed'),
+            statusColor: '#34C759' 
+        },
     ];
+
+    const handleCall = (phone: string) => {
+        Linking.openURL(`tel:${phone}`);
+    };
+
+    const handleNavigate = (location: string) => {
+        const url = Platform.select({
+            ios: `maps:0,0?q=${location}`,
+            android: `geo:0,0?q=${location}`,
+        });
+        if (url) Linking.openURL(url);
+    };
+
+    const renderEmptyState = () => (
+        <View style={styles.emptyContainer}>
+            <View style={[styles.emptyIconBox, { backgroundColor: theme.tint + '10' }]}>
+                <MaterialCommunityIcons 
+                    name={activeTab === 'pending' ? 'calendar-blank' : 'history'} 
+                    size={64} 
+                    color={theme.tint} 
+                />
+            </View>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                {activeTab === 'pending' ? t('technician.no_ongoing_orders') : t('technician.no_history_orders')}
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: theme.subText }]}>
+                {t('technician.ready_for_work')}
+            </Text>
+        </View>
+    );
+
+    const orders = activeTab === 'pending' ? pendingOrders : completedOrders;
 
     return (
-        <AppBody> 
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.title, { color: theme.text }]}>{t('technician.jobs_title')}</Text>
-            </View> */}
-            <TechnicianHeader title={t('technician.jobs_title')} onBackPress={() => {}} />
+        <AppBody style={{ flex: 1, backgroundColor: theme.background }}>
+            <TechnicianHeader title={t('technician.jobs_title')} />
+            
             <View style={[styles.tabContainer, { backgroundColor: theme.cardBackground }]}>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
+                    activeOpacity={0.8}
+                    style={[styles.tab, activeTab === 'pending' && { backgroundColor: theme.tint }]}
                     onPress={() => setActiveTab('pending')}>
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'pending' && styles.activeTabText,
-                        activeTab !== 'pending' && { color: theme.subText }
+                        activeTab === 'pending' ? { color: '#000' } : { color: theme.subText }
                     ]}>
-                        {t('technician.ongoing')} ({pendingOrders.length})
+                        {t('technician.ongoing')}
                     </Text>
+                    {pendingOrders.length > 0 && (
+                        <View style={[styles.badge, { backgroundColor: activeTab === 'pending' ? '#000' : theme.tint }]}>
+                            <Text style={[styles.badgeText, { color: activeTab === 'pending' ? theme.tint : '#000' }]}>
+                                {pendingOrders.length}
+                            </Text>
+                        </View>
+                    )}
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
+                    activeOpacity={0.8}
+                    style={[styles.tab, activeTab === 'completed' && { backgroundColor: theme.tint }]}
                     onPress={() => setActiveTab('completed')}>
                     <Text style={[
                         styles.tabText,
-                        activeTab === 'completed' && styles.activeTabText,
-                        activeTab !== 'completed' && { color: theme.subText }
+                        activeTab === 'completed' ? { color: '#000' } : { color: theme.subText }
                     ]}>
-                        {t('technician.history')} ({completedOrders.length})
+                        {t('technician.history')}
                     </Text>
                 </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.content}>
-                {activeTab === 'pending' ? (
-                    pendingOrders.map((order) => (
-                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} onPress={()=>navigation.navigate('TaskDetailScreen', { task: order } )}>
+            <ScrollView 
+                style={styles.content} 
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 40 }}
+            >
+                {orders.length === 0 ? renderEmptyState() : (
+                    orders.map((order) => (
+                        <TouchableOpacity 
+                            key={order.id} 
+                            activeOpacity={0.9}
+                            style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} 
+                            onPress={() => navigation.navigate('TaskDetailScreen', { task: order })}
+                        >
                             <View style={styles.orderHeader}>
-                                <Text style={[styles.orderService, { color: theme.text }]}>{order.service}</Text>
-                                <View style={[styles.statusBadge, { backgroundColor: order.statusColor + '20' }]}>
+                                <View>
+                                    <Text style={styles.orderId}>{order.id}</Text>
+                                    <Text style={[styles.orderService, { color: theme.text }]}>{order.service}</Text>
+                                </View>
+                                <View style={[styles.statusBadge, { backgroundColor: order.statusColor + '15' }]}>
                                     <Text style={[styles.statusText, { color: order.statusColor }]}>{order.status}</Text>
                                 </View>
                             </View>
-                            <View style={styles.orderRow}>
-                                <MaterialCommunityIcons name="map-marker" size={16} color={theme.subText} />
-                                <Text style={[styles.orderCustomer, { color: theme.subText }]}>{order.location}</Text>
-                            </View>
-                            <View style={styles.orderRow}>
-                                <MaterialCommunityIcons name="clock-outline" size={16} color={theme.subText} />
-                                <Text style={[styles.orderTime, { color: theme.subText }]}>{order.time}</Text>
-                            </View>
-                            <View style={[styles.orderActions, { borderTopColor: theme.border }]}>
-                                <TouchableOpacity style={styles.viewButton}>
-                                    <Text style={styles.viewButtonText}>{t('technician.open_navigation')}</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </TouchableOpacity>
-                    ))
 
-                ) : (
-                    completedOrders.map((order) => (
-                        <TouchableOpacity key={order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} onPress={()=>navigation.navigate('TaskDetailScreen', { task: order } )}>
-                            <View style={styles.orderHeader}>
-                                <Text style={[styles.orderService, { color: theme.text }]}>{order.service}</Text>
-                                <Text style={styles.orderAmount}>{order.amount}</Text>
+                            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+                            <View style={styles.infoGrid}>
+                                <View style={styles.infoItem}>
+                                    <MaterialCommunityIcons name="account-outline" size={18} color={theme.subText} />
+                                    <Text style={[styles.infoText, { color: theme.text }]}>{order.customer}</Text>
+                                </View>
+                                <View style={styles.infoItem}>
+                                    <MaterialCommunityIcons name="car-outline" size={18} color={theme.subText} />
+                                    <Text style={[styles.infoText, { color: theme.text }]}>{order.vehicle}</Text>
+                                </View>
+                                {activeTab === 'pending' ? (
+                                    <View style={styles.infoItem}>
+                                        <MaterialCommunityIcons name="map-marker-radius-outline" size={18} color={theme.subText} />
+                                        <Text style={[styles.infoText, { color: theme.text }]} numberOfLines={1} ellipsizeMode="tail">
+                                            {truncateText(order.location || '', 4)}
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <View style={styles.infoItem}>
+                                        <MaterialCommunityIcons name="currency-usd" size={18} color={colors.success} />
+                                        <Text style={[styles.infoText, { color: colors.success, fontWeight: '700' }]}>{order.amount}</Text>
+                                    </View>
+                                )}
+                                <View style={styles.infoItem}>
+                                    <MaterialCommunityIcons name="clock-outline" size={18} color={theme.subText} />
+                                    <Text style={[styles.infoText, { color: theme.text }]}>{order.time}</Text>
+                                </View>
                             </View>
-                            <View style={styles.orderRow}>
-                                <MaterialCommunityIcons name="account-check" size={16} color={theme.subText} />
-                                <Text style={[styles.orderCustomer, { color: theme.subText }]}>{order.customer}</Text>
-                            </View>
-                            <View style={styles.orderRow}>
-                                <MaterialCommunityIcons name="check-decagram" size={16} color="#2ECC71" />
-                                <Text style={[styles.orderTime, { color: theme.subText }]}>{t('status.completed')} {order.time}</Text>
-                            </View>
+
+                            {activeTab === 'pending' && (
+                                <View style={styles.actionRow}>
+                                    <TouchableOpacity 
+                                        style={[styles.actionButton, { backgroundColor: theme.tint + '15' }]}
+                                        onPress={() => handleCall(order.phone!)}
+                                    >
+                                        <MaterialCommunityIcons name="phone" size={18} color={theme.tint} />
+                                        <Text style={[styles.actionButtonText, { color: theme.tint }]}>{t('technician.call_customer')}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.actionButton, { backgroundColor: '#E3F2FD' }]}
+                                        onPress={() => handleNavigate(order.location!)}
+                                    >
+                                        <MaterialCommunityIcons name="navigation-variant" size={18} color="#1E88E5" />
+                                        <Text style={[styles.actionButtonText, { color: '#1E88E5' }]}>{t('technician.navigate')}</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.actionButton, { backgroundColor: '#F2F2F7' }]}
+                                        onPress={() => navigation.navigate('TaskDetailScreen', { task: order })}
+                                    >
+                                        <Text style={[styles.actionButtonText, { color: '#8E8E93' }]}>{t('technician.details')}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
                         </TouchableOpacity>
                     ))
                 )}
             </ScrollView>
-        </View>
         </AppBody>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FA',
-    },
-    // header: {
-    //     padding: 20,
-    //     backgroundColor: '#FFFFFF',
-    // },
-    // title: {
-    //     fontSize: 24,
-    //     fontWeight: 'bold',
-    //     color: '#1C1C1E',
-    // },
     tabContainer: {
         flexDirection: 'row',
-        backgroundColor: '#FFFFFF',
         padding: 4,
-        margin: 20,
-        borderRadius: 12,
+        marginHorizontal: 16,
+        marginVertical: 16,
+        borderRadius: 14,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
+        shadowRadius: 10,
         elevation: 2,
     },
     tab: {
         flex: 1,
+        flexDirection: 'row',
         paddingVertical: 12,
-        borderRadius: 8,
+        borderRadius: 10,
         alignItems: 'center',
-    },
-    activeTab: {
-        backgroundColor: '#F4C430',
+        justifyContent: 'center',
+        gap: 8,
     },
     tabText: {
         fontSize: 14,
-        fontWeight: '600',
-        color: '#8E8E93',
+        fontWeight: '700',
+        letterSpacing: 0.2,
     },
-    activeTabText: {
-        color: '#1C1C1E',
+    badge: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        minWidth: 20,
+        alignItems: 'center',
+    },
+    badgeText: {
+        fontSize: 11,
+        fontWeight: '800',
     },
     content: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
     },
     orderCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
+        borderRadius: 20,
         padding: 16,
-        marginBottom: 12,
+        marginBottom: 16,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        elevation: 3,
     },
     orderHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         marginBottom: 12,
     },
+    orderId: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#8E8E93',
+        marginBottom: 2,
+    },
     orderService: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#1C1C1E',
+        fontSize: 18,
+        fontWeight: '800',
     },
     statusBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
     },
     statusText: {
-        fontSize: 11,
-        fontWeight: '600',
+        fontSize: 12,
+        fontWeight: '800',
+        textTransform: 'uppercase',
     },
-    orderAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#2ECC71',
+    divider: {
+        height: 1,
+        width: '100%',
+        marginBottom: 12,
     },
-    orderRow: {
+    infoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    infoItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 6,
+        width: '48%',
         gap: 6,
     },
-    orderCustomer: {
-        fontSize: 14,
-        color: '#8E8E93',
-    },
-    orderTime: {
+    infoText: {
+        flex: 1,
         fontSize: 13,
-        color: '#8E8E93',
-    },
-    orderActions: {
-        marginTop: 8,
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: '#F0F0F0',
-    },
-    viewButton: {
-        paddingVertical: 8,
-        alignItems: 'center',
-    },
-    viewButtonText: {
-        fontSize: 14,
         fontWeight: '600',
-        color: '#F4C430',
+    },
+    actionRow: {
+        flexDirection: 'row',
+        marginTop: 16,
+        gap: 8,
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        borderRadius: 12,
+        gap: 6,
+    },
+    actionButtonText: {
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 60,
+        paddingHorizontal: 40,
+    },
+    emptyIconBox: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: '800',
+        textAlign: 'center',
+        marginBottom: 8,
+    },
+    emptySubtitle: {
+        fontSize: 15,
+        textAlign: 'center',
+        lineHeight: 22,
     },
 });

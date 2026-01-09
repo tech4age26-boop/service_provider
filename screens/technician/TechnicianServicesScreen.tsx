@@ -1,190 +1,161 @@
-/**
- * Technician Dashboard - Services Screen
- */
-
-import React, { useState } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Switch,
-} from 'react-native';
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
-
+import React, { useState, useRef, useCallback } from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../App';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+import { useTheme } from '../../theme/ThemeContext';
 import AppBody from '../../components/app_body/app-body';
 import TechnicianHeader from '../../components/technician_header/technician-header';
+
+import { ServiceProductTabs } from '../../components/services/service-product-tabs';
+import { ServiceList } from '../../components/services/service-list';
+import { ProductList } from '../../components/services/product-list';
+import { AddEditSheet } from '../../components/services/add-edit-sheet';
+import { FAB } from '../../components/common/FAB';
+
+import { Service, SheetMode } from '../../types';
 
 export function TechnicianServicesScreen() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const [modalVisible, setModalVisible] = useState(false);
 
-  const [services, setServices] = useState([
-    { id: '1', name: 'Roadside Assistance', enabled: true, icon: 'car-side' },
-    { id: '2', name: 'Tire Repair', enabled: true, icon: 'tire' },
+  const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
+  const [sheetMode, setSheetMode] = useState<SheetMode>('add');
+  const [editingItem, setEditingItem] = useState<Partial<Service> | null>(null);
+
+  const [services, setServices] = useState<Service[]>([
     {
-      id: '3',
-      name: 'Battery Service',
-      enabled: false,
-      icon: 'battery-charging',
+      id: '1',
+      name: 'Roadside Assistance',
+      price: '150',
+      duration: '45',
+      category: 'service',
+      serviceTypes: ['Roadside Assistance', 'Tire Repair'],
+      status: 'active',
     },
-    { id: '4', name: 'Oil Change (on-site)', enabled: true, icon: 'oil' },
     {
-      id: '5',
-      name: 'Computer Diagnostics',
-      enabled: false,
-      icon: 'laptop-car',
+      id: '2',
+      name: 'Oil Change',
+      price: '80',
+      duration: '30',
+      category: 'service',
+      serviceTypes: ['Oil Change'],
+      status: 'active',
     },
   ]);
 
-  const toggleService = (id: string) => {
-    setServices(prev =>
-      prev.map(s => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
-    );
+  const [products, setProducts] = useState<Service[]>([
+    {
+      id: '101',
+      name: 'Brake Pads (Toyota)',
+      price: '250',
+      duration: '-',
+      category: 'product',
+      subCategory: 'Brake Pads',
+      stock: '15',
+      sku: 'BP-TY-001',
+      status: 'active',
+    },
+    {
+      id: '102',
+      name: 'Synthetic Oil 5W-30',
+      price: '60',
+      duration: '-',
+      category: 'product',
+      subCategory: 'Fluids',
+      stock: '45',
+      sku: 'OIL-SYN-530',
+      status: 'active',
+    },
+  ]);
+
+  const handleOpenAdd = () => {
+    console.log('Opening Add Sheet');
+    setSheetMode('add');
+    setEditingItem(null);
+    setModalVisible(true);
+  };
+
+  const handleEdit = (item: Service) => {
+    console.log('Editing Item', item);
+    setSheetMode('edit');
+    setEditingItem(item);
+    setModalVisible(true);
+  };
+
+  const handleSave = (data: Partial<Service>) => {
+    if (sheetMode === 'add') {
+      const newItem = { ...data, id: Date.now().toString() } as Service;
+      if (activeTab === 'services') {
+        setServices((prev) => [...prev, newItem]);
+      } else {
+        setProducts((prev) => [...prev, newItem]);
+      }
+    } else {
+      if (data.category === 'service') {
+        setServices((prev) =>
+          prev.map((item) => (item.id === editingItem?.id ? { ...item, ...data } as Service : item))
+        );
+      } else {
+        setProducts((prev) =>
+          prev.map((item) => (item.id === editingItem?.id ? { ...item, ...data } as Service : item))
+        );
+      }
+    }
+    setModalVisible(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (activeTab === 'services') {
+      setServices((prev) => prev.filter((item) => item.id !== id));
+    } else {
+      setProducts((prev) => prev.filter((item) => item.id !== id));
+    }
   };
 
   return (
-    <AppBody>
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        {/* <View style={[styles.header, { backgroundColor: theme.cardBackground }]}> */}
-        {/* <Text style={[styles.title, { color: theme.text }]}>{t('technician.services_title')}</Text>
-                <Text style={styles.subtitle}>{t('technician.services_subtitle')}</Text> */}
-
-        {/* </View> */}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppBody style={{ flex: 1, backgroundColor: theme.background }}>
         <TechnicianHeader
           title={t('technician.services_title')}
           subtitle={t('technician.services_subtitle')}
-          onBackPress={() => {}}
         />
 
-        <ScrollView style={styles.content}>
-          <View
-            style={[styles.section, { backgroundColor: theme.cardBackground }]}
-          >
-            {services.map((service, index) => (
-              <View
-                key={service.id}
-                style={[
-                  styles.serviceItem,
-                  {
-                    borderBottomColor: theme.border,
-                    borderBottomWidth: index === services.length - 1 ? 0 : 1,
-                  },
-                ]}
-              >
-                <View style={styles.serviceLeft}>
-                  <View
-                    style={[
-                      styles.iconBox,
-                      {
-                        backgroundColor: service.enabled
-                          ? '#F4C43020'
-                          : '#F5F5F5',
-                      },
-                    ]}
-                  >
-                    <MaterialCommunityIcons
-                      name={service.icon as any}
-                      size={22}
-                      color={service.enabled ? '#F4C430' : '#8E8E93'}
-                    />
-                  </View>
-                  <Text style={[styles.serviceName, { color: theme.text }]}>
-                    {service.name}
-                  </Text>
-                </View>
-                <Switch
-                  value={service.enabled}
-                  onValueChange={() => toggleService(service.id)}
-                  trackColor={{ false: '#767577', true: '#F4C430' }}
-                  thumbColor={service.enabled ? '#FFF' : '#f4f3f4'}
-                />
-              </View>
-            ))}
-          </View>
+        <ServiceProductTabs
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          counts={{ services: services.length, products: products.length }}
+        />
 
-          <TouchableOpacity style={styles.addButton}>
-            <MaterialCommunityIcons name="plus" size={20} color="#1C1C1E" />
-            <Text style={styles.addButtonText}>
-              {t('technician.add_service_type')}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </AppBody>
+        <View style={styles.content}>
+          {activeTab === 'services' ? (
+            <ServiceList data={services as any} onEdit={handleEdit} onDelete={handleDelete} />
+          ) : (
+            <ProductList data={products as any} onEdit={handleEdit} onDelete={handleDelete} />
+          )}
+        </View>
+
+        <FAB
+          onPress={handleOpenAdd}
+          label={activeTab === 'services' ? t('technician.add_service_type') : t('products.add_new')}
+        />
+
+        <AddEditSheet
+          visible={modalVisible}
+          initialData={editingItem}
+          mode={sheetMode}
+          type={activeTab === 'services' ? 'service' : 'product'}
+          onSave={handleSave}
+          onClose={() => setModalVisible(false)}
+        />
+      </AppBody>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-  },
-  header: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 4,
-  },
   content: {
     flex: 1,
-    padding: 20,
-  },
-  section: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  serviceItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-  },
-  serviceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  serviceName: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  addButton: {
-    flexDirection: 'row',
-    backgroundColor: '#F4C430',
-    padding: 16,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  addButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
   },
 });

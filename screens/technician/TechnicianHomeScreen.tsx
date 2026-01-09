@@ -11,8 +11,10 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../App';
+import { useTheme } from '../../theme/ThemeContext';
 import AppBody from '../../components/app_body/app-body';
+import { typography } from '../../theme/typography';
+import { colors } from '../../theme/colors';
 
 interface Task {
   id: string;
@@ -24,6 +26,12 @@ interface Task {
   status: 'active' | 'next' | 'completed';
 }
 
+interface UserData {
+  logoUrl?: string;
+  ownerName?: string;
+  workshopName?: string;
+}
+
 interface Props {
   navigation: any;
 }
@@ -31,20 +39,27 @@ interface Props {
 export function TechnicianHomeScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUserData();
     loadTasks();
+    setLoading(false);
   }, []);
 
   const loadUserData = async () => {
     try {
       const data = await AsyncStorage.getItem('user_data');
-      if (data) setUserData(JSON.parse(data));
+      if (data) {
+        const parsedData = JSON.parse(data) as UserData;
+        setUserData(parsedData);
+      }
     } catch (error) {
       console.error('Error loading user data:', error);
+      setError('Failed to load user data');
     }
   };
 
@@ -87,19 +102,19 @@ export function TechnicianHomeScreen({ navigation }: Props) {
   };
 
   const renderTask = (task: Task) => {
-    let badgeColor = '#FFF3CD';
-    let textColor = '#856404';
+    let badgeColor = colors.primaryLight;
+    let textColor = colors.primary;
     let statusLabel = t('status.in_transit');
     let iconName = 'tools';
 
     if (task.status === 'next') {
-      badgeColor = '#D1ECF1';
-      textColor = '#0C5460';
+      badgeColor = 'rgba(0, 122, 255, 0.15)';
+      textColor = colors.info;
       statusLabel = t('status.next_task');
       iconName = 'calendar-alt';
     } else if (task.status === 'completed') {
-      badgeColor = '#D4EDDA';
-      textColor = '#155724';
+      badgeColor = colors.successLight;
+      textColor = colors.success;
       statusLabel = t('status.completed');
       iconName = 'check-circle';
     }
@@ -112,7 +127,9 @@ export function TechnicianHomeScreen({ navigation }: Props) {
         onPress={() => navigation.navigate('TaskDetailScreen', { task })}
       >
         <View style={styles.orderHeader}>
-          <FontAwesome5 name={iconName} size={20} color={textColor} solid />
+          <View style={[styles.taskIconContainer, { backgroundColor: badgeColor }]}>
+            <FontAwesome5 name={iconName} size={18} color={textColor} solid />
+          </View>
           <Text style={[styles.orderTitle, { color: theme.text }]}>
             {task.service}
           </Text>
@@ -122,19 +139,19 @@ export function TechnicianHomeScreen({ navigation }: Props) {
             </Text>
           </View>
         </View>
-        <Text style={styles.orderCustomer}>
+        <Text style={[styles.orderCustomer, { color: theme.subText }]}>
           {t('common.customer')}: {task.customer}
         </Text>
-        <Text style={styles.orderCustomer}>
+        <Text style={[styles.orderCustomer, { color: theme.subText }]}>
           {t('common.location')}: {task.location}
         </Text>
         {task.eta && (
-          <Text style={styles.orderTime}>
+          <Text style={[styles.orderTime, { color: theme.text }]}>
             {t('common.eta')}: {task.eta}
           </Text>
         )}
         {task.scheduled && (
-          <Text style={styles.orderTime}>
+          <Text style={[styles.orderTime, { color: theme.text }]}>
             {t('common.scheduled')}: {task.scheduled}
           </Text>
         )}
@@ -162,260 +179,268 @@ export function TechnicianHomeScreen({ navigation }: Props) {
         {userData?.logoUrl ? (
           <Image
             source={{ uri: userData.logoUrl }}
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              borderWidth: 2,
-              borderColor: '#F4C430',
-            }}
+            style={[styles.profileImage, { borderColor: theme.tint }]}
           />
         ) : (
-          <View
-            style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-              backgroundColor: '#F4C430',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+          <View style={[styles.profilePlaceholder, { backgroundColor: theme.tint }]}>
             <MaterialCommunityIcons
               name="account-wrench"
               size={30}
-              color="#1C1C1E"
+              color={colors.secondary}
             />
           </View>
         )}
 
         <View style={{ flex: 1, marginLeft: 12 }}>
-          <Text style={styles.greeting}>
+          <Text style={[styles.greeting, { color: theme.subText }]}>
             {t('home.welcome_back')},{' '}
             {userData?.ownerName || t('common.user')}! 👋
           </Text>
           <Text style={[styles.shopName, { color: theme.text }]}>
-            {userData?.workshopName || 'Filter Technician'}
+            {userData?.workshopName || t('common.filter_technician')}
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.notificationIcon}
+          style={[styles.notificationIcon, { backgroundColor: theme.inputBackground }]}
           onPress={() => navigation.navigate('Notification')}
         >
-          <FontAwesome5 name="bell" size={22} color="#1C1C1E" solid />
+          <FontAwesome5 name="bell" size={20} color={theme.text} solid />
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={[styles.container, { backgroundColor: theme.background }]}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.statsContainer}>
-          <View
-            style={[styles.statCard, { backgroundColor: theme.cardBackground }]}
-          >
-            <FontAwesome5 name="tasks" size={26} color="#F4C430" solid />
-            <Text style={[styles.statNumber, { color: theme.text }]}>
-              {tasks.length}
+        {/* Enhanced Stats Cards */}
+        <View style={styles.statsGrid}>
+          {/* Today's Earnings */}
+          <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: colors.successLight }]}>
+              <MaterialCommunityIcons name="cash-multiple" size={24} color={colors.success} />
+            </View>
+            <Text style={[styles.statNumber, { color: theme.text }]}>1,250</Text>
+            <Text style={[styles.statLabel, { color: theme.subText }]}>
+              {t('home.earnings_today')} SAR
             </Text>
-            <Text style={styles.statLabel}>{t('home.my_tasks')}</Text>
           </View>
 
-          <View
-            style={[styles.statCard, { backgroundColor: theme.cardBackground }]}
-          >
-            <FontAwesome5 name="star" size={26} color="#FFB800" solid />
-            <Text style={[styles.statNumber, { color: theme.text }]}>4.9</Text>
-            <Text style={styles.statLabel}>{t('home.rating')}</Text>
-          </View>
-        </View>
-
-        <View style={styles.statsContainer}>
-          <View
-            style={[styles.statCard, { backgroundColor: theme.cardBackground }]}
-          >
-            <FontAwesome5
-              name="money-bill-wave"
-              size={26}
-              color="#2ECC71"
-              solid
-            />
-            <Text style={[styles.statNumber, { color: theme.text }]}>$450</Text>
-            <Text style={styles.statLabel}>{t('home.earnings_today')}</Text>
-          </View>
-
-          <View
-            style={[styles.statCard, { backgroundColor: theme.cardBackground }]}
-          >
-            <FontAwesome5
-              name="map-marker-alt"
-              size={26}
-              color="#007AFF"
-              solid
-            />
+          {/* Active Jobs */}
+          <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: colors.primaryLight }]}>
+              <MaterialCommunityIcons name="briefcase-clock" size={24} color={colors.primary} />
+            </View>
             <Text style={[styles.statNumber, { color: theme.text }]}>
               {activeTasks.length}
             </Text>
-            <Text style={styles.statLabel}>{t('home.onsite_visits')}</Text>
+            <Text style={[styles.statLabel, { color: theme.subText }]}>
+              {t('home.active_jobs')}
+            </Text>
+          </View>
+
+          {/* Completion Rate */}
+          <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(0, 122, 255, 0.15)' }]}>
+              <MaterialCommunityIcons name="chart-line" size={24} color={colors.info} />
+            </View>
+            <Text style={[styles.statNumber, { color: theme.text }]}>98%</Text>
+            <Text style={[styles.statLabel, { color: theme.subText }]}>
+              {t('home.completion_rate')}
+            </Text>
+          </View>
+
+          {/* Average Rating */}
+          <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
+            <View style={[styles.statIconContainer, { backgroundColor: 'rgba(255, 204, 0, 0.15)' }]}>
+              <MaterialCommunityIcons name="star" size={24} color={colors.warning} />
+            </View>
+            <Text style={[styles.statNumber, { color: theme.text }]}>4.9</Text>
+            <Text style={[styles.statLabel, { color: theme.subText }]}>
+              {t('home.rating')}
+            </Text>
           </View>
         </View>
 
+        {/* Active Tasks Section */}
         {activeTasks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Active Tasks
+                {t('home.active_orders')}
               </Text>
             </View>
             {activeTasks.map(renderTask)}
           </View>
         )}
 
+        {/* Next Tasks Section */}
         {nextTasks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Next Tasks
+                {t('status.next_task')}
               </Text>
             </View>
             {nextTasks.map(renderTask)}
           </View>
         )}
 
+        {/* Completed Tasks Section */}
         {completedTasks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Completed Tasks
+                {t('orders.completed')}
               </Text>
             </View>
             {completedTasks.map(renderTask)}
           </View>
         )}
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </AppBody>
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    paddingTop: 12,
   },
   header: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    // marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+  },
+  profilePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   greeting: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 4,
+    ...typography.caption,
+    marginBottom: 2,
   },
   shopName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    ...typography.subheader,
   },
-    notificationIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: '#F4C430',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: 8,
-    },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 12,
-    marginBottom: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+  notificationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: 16,
+    gap: 12,
+  },
+  statCard: {
+    width: '48%',
+    padding: 20,
+    borderRadius: 20,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  statIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
   statNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-    marginTop: 8,
+    ...typography.header,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 11,
-    color: '#8E8E93',
-    marginTop: 4,
+    ...typography.caption,
+    textAlign: 'center',
   },
   section: {
-    padding: 20,
+    paddingHorizontal: 20,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-  },
-  viewAll: {
-    fontSize: 14,
-    color: '#F4C430',
-    fontWeight: '600',
+    ...typography.subheader,
   },
   orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 6,
     elevation: 2,
   },
   orderHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    gap: 10,
+  },
+  taskIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   orderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
+    flex: 1,
+    ...typography.body,
+    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   statusText: {
-    fontSize: 11,
+    ...typography.caption,
     fontWeight: '600',
   },
   orderCustomer: {
-    fontSize: 14,
-    color: '#8E8E93',
+    ...typography.caption,
     marginBottom: 4,
   },
   orderTime: {
-    fontSize: 12,
-    color: '#999',
+    ...typography.caption,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

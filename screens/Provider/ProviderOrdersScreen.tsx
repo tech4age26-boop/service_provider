@@ -13,7 +13,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../App';
+import { useTheme } from '../../theme/ThemeContext';
 
 export function ProviderOrdersScreen() {
     const { theme } = useTheme();

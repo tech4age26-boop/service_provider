@@ -26,7 +26,11 @@
         "location": "Location",
         "customer": "Customer",
         "eta": "ETA",
-        "scheduled": "Scheduled"
+        "dashboard": "Dashboard",
+        "filter_technician": "Filter Technician",
+        "scheduled": "Scheduled",
+        "description": "Description",
+        "description_placeholder": "Enter description here..."
     },
     "auth": {
         "login_title": "Login to your account",
@@ -65,19 +69,23 @@
         "work_address": "Work Address / City",
         "no_locations": "No locations found",
         "success_msg": "Registration Submitted Successfully! You can now login.",
-        "error_fill_fields": "Please fill all fields, select an address, and upload a logo"
+        "error_fill_fields": "Please fill all fields, select an address, and upload a logo",
+        "secure_verified": "Secure & Verified Registration"
     },
     "home": {
-        "welcome_back": "Welcome Back",
+        "welcome_back": "Welcome back",
         "active_orders": "Active Orders",
         "employees": "Employees",
         "revenue_today": "Revenue Today",
         "rating": "Rating",
         "recent_orders": "Recent Orders",
         "my_tasks": "My Tasks",
-        "earnings_today": "Earnings Today",
+        "earnings_today": "Today's Earnings",
         "onsite_visits": "On-site Visits",
-        "view_history": "View History"
+        "view_history": "View History",
+        "wallet_balance": "Wallet Balance",
+        "active_jobs": "Active Jobs",
+        "completion_rate": "Completion Rate"
     },
     "status": {
         "pending": "Pending",
@@ -85,7 +93,9 @@
         "completed": "Completed",
         "cancelled": "Cancelled",
         "in_transit": "In Transit",
-        "next_task": "Next Task"
+        "next_task": "Next Task",
+        "active": "Active",
+        "inactive": "Inactive"
     },
     "settings": {
         "appearance": "APPEARANCE",
@@ -102,7 +112,11 @@
         "job_notifications": "Job Notifications",
         "personal_details": "PERSONAL DETAILS",
         "payment_info": "Payment Info",
-        "preferences": "PREFERENCES"
+        "preferences": "PREFERENCES",
+        "my_wallet": "My Wallet",
+        "my_certifications": "My Certifications",
+        "language_title": "Language",
+        "terms_privacy": "Terms & Privacy"
     },
     "employees": {
         "title": "Employees Management",
@@ -114,10 +128,18 @@
     },
     "products": {
         "title": "Products & Services",
-        "add_new": "Add New",
+        "add_new": "Add Items",
         "services": "Services",
         "parts": "Parts",
-        "search_placeholder": "Search products or services..."
+        "search_placeholder": "Search products or services...",
+        "available": "Available",
+        "product_name": "Product Name",
+        "company_name": "Company Name",
+        "stock_qty": "Stock Qty",
+        "sku": "SKU",
+        "price": "Price",
+        "category": "Category",
+        "select_category": "Select Category"
     },
     "orders": {
         "title": "Orders",
@@ -131,8 +153,19 @@
         "history": "History",
         "open_navigation": "Open Navigation",
         "services_title": "My Services",
-        "services_subtitle": "Toggle services you are currently offering",
-        "add_service_type": "Add New Service Type"
+        "services_subtitle": "Manage your services and products catalog",
+        "add_service_type": "Add Services",
+        "service_name": "Service Name",
+        "duration_min": "Duration (min)",
+        "order_id": "Order ID",
+        "customer": "Customer",
+        "car_model": "Vehicle",
+        "call_customer": "Call",
+        "navigate": "Navigate",
+        "details": "Details",
+        "no_ongoing_orders": "No ongoing orders at the moment",
+        "no_history_orders": "No orders in your history yet",
+        "ready_for_work": "Ready for your next job?"
     },
     "services": {
         "car_wash": "Car Wash",
@@ -142,5 +175,43 @@
         "engine_diagnostics": "Engine Diagnostics",
         "ac_repair": "AC Repair",
         "battery_replacement": "Battery Replacement"
+    },
+    "wallet": {
+        "title": "My Wallet",
+        "total_balance": "Total Balance",
+        "available": "Available",
+        "pending": "Pending",
+        "request_withdrawal": "Request Withdrawal",
+        "payout_methods": "Payout Methods",
+        "payment_methods": "Payment Methods",
+        "add_new": "+ Add New",
+        "recent_transactions": "Recent Transactions",
+        "view_all_transactions": "View All Transactions",
+        "payment_received": "Payment Received",
+        "payout_withdrawal": "Payout Withdrawal",
+        "processing": "Processing",
+        "completed": "Completed",
+        "method_wallet": "Wallet",
+        "method_mada": "MADA",
+        "method_visa": "VISA",
+        "method_cash": "Cash",
+        "method_bank": "Bank Transfer",
+        "method_tabby": "Tabby",
+        "method_tamara": "Tamara",
+        "method_credit": "Credit (Corporate)",
+        "method_credit_subtitle": "For Corporate Customers Only"
+    },
+    "placeholders": {
+        "your_name": "Your Name",
+        "business_name": "Business Name",
+        "service_desc": "Tell us about your services...",
+        "search_address": "City, District",
+        "cr_placeholder": "1010...",
+        "vat_placeholder": "3000..."
+    },
+    "messages": {
+        "success": "Success",
+        "profile_updated": "Profile updated successfully",
+        "logout_confirm": "Are you sure you want to logout?"
     }
 }

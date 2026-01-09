@@ -20,7 +20,7 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../App';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Employee {
 

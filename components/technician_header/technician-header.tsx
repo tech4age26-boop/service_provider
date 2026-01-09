@@ -1,19 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../App';
+import { useTheme } from '../../theme/ThemeContext';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 
 interface TechnicianHeaderProps {
   title?: string;
   subtitle?: string;
   onBackPress?: () => void;
+  rightComponent?: React.ReactNode;
 }
 
 const TechnicianHeader: React.FC<TechnicianHeaderProps> = ({
   title,
   subtitle,
   onBackPress,
+  rightComponent,
 }) => {
   // const { t } = useTranslation();
   const { theme } = useTheme();
@@ -45,6 +46,12 @@ const TechnicianHeader: React.FC<TechnicianHeaderProps> = ({
               </Text>
             ) : null}
           </View>
+
+          {rightComponent && (
+            <View style={styles.rightContainer}>
+              {rightComponent}
+            </View>
+          )}
         </View>
       </View>
     </View>
@@ -71,7 +78,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap:20
+    gap: 20
   },
   backButton: {
     width: 42,
@@ -90,9 +97,12 @@ const styles = StyleSheet.create({
   textContainer: {
     flex: 1,
   },
+  rightContainer: {
+    marginLeft: 8,
+  },
   title: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '700' as const,
   },
   subtitle: {
     fontSize: 14,

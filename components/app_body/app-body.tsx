@@ -18,18 +18,31 @@ interface AppBodyProps {
   statusBarStyle?: StatusBarStyle;
 }
 
+import { useTheme } from "../../theme/ThemeContext";
+
 const AppBody: React.FC<AppBodyProps> = ({
   children,
   style,
-  backgroundColor = "#FFFFFF",
-  statusBarStyle = "dark-content",
+  backgroundColor,
+  statusBarStyle,
 }) => {
+  const { theme } = useTheme();
+
+  // Default to theme background if not provided
+  const finalBackgroundColor = backgroundColor || theme.background;
+
+  // Default status bar style based on theme mode
+  // If theme is dark, we want light text (light-content)
+  // If theme is light, we want dark text (dark-content)
+  const defaultBarStyle = theme.mode === 'dark' ? 'light-content' : 'dark-content';
+  const finalBarStyle = statusBarStyle || defaultBarStyle;
+
   return (
     <SafeAreaView
-      style={[styles.safeArea, { backgroundColor }]}
+      style={[styles.safeArea, { backgroundColor: finalBackgroundColor }]}
       edges={["top", "bottom"]}
     >
-      <StatusBar barStyle={statusBarStyle} />
+      <StatusBar barStyle={finalBarStyle} />
 
       <KeyboardAvoidingView
         style={styles.flex}

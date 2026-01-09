@@ -14,15 +14,17 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '../../App';
+import { useTheme } from '../../theme/ThemeContext';
 import AppBody from '../../components/app_body/app-body';
 import TechnicianHeader from '../../components/technician_header/technician-header';
+import { typography } from '../../theme/typography';
 
 interface TechnicianSettingsScreenProps {
     onLogout?: () => void;
+    navigation?: any;
 }
 
-export function TechnicianSettingsScreen({ onLogout }: TechnicianSettingsScreenProps) {
+export function TechnicianSettingsScreen({ onLogout, navigation }: TechnicianSettingsScreenProps) {
     const { theme, toggleTheme, isDarkMode } = useTheme();
     const { t } = useTranslation();
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
@@ -39,89 +41,138 @@ export function TechnicianSettingsScreen({ onLogout }: TechnicianSettingsScreenP
         }
     };
 
+    const renderSettingItem = (
+        icon: string,
+        label: string,
+        onPress?: () => void,
+        rightElement?: React.ReactNode,
+        isDestructive: boolean = false
+    ) => (
+        <TouchableOpacity
+            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+            onPress={onPress}
+            disabled={!onPress}
+            activeOpacity={onPress ? 0.7 : 1}
+        >
+            <View style={styles.settingLeft}>
+                <View style={[styles.iconBox, { backgroundColor: isDestructive ? '#FFE5E5' : theme.inputBackground }]}>
+                    <MaterialCommunityIcons
+                        name={icon}
+                        size={20}
+                        color={isDestructive ? '#FF3B30' : theme.text}
+                    />
+                </View>
+                <Text style={[
+                    styles.settingText,
+                    { color: isDestructive ? '#FF3B30' : theme.text }
+                ]}>
+                    {label}
+                </Text>
+            </View>
+            {rightElement || (
+                onPress && (
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+                )
+            )}
+        </TouchableOpacity>
+    );
+
     return (
-        <AppBody>
-        <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.title, { color: theme.text }]}>{t('settings.settings_title')}</Text>
-            </View> */}
-            <TechnicianHeader title={t('settings.settings_title')}  />
-
-
-            <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                <Text style={styles.sectionTitle}>{t('settings.work_status')}</Text>
-                <View style={styles.settingItem}>
-                    <View style={styles.settingLeft}>
-                        <MaterialCommunityIcons name="clock-fast" size={22} color={theme.iconColor} />
-                        <Text style={[styles.settingText, { color: theme.text }]}>{t('settings.available_to_work')}</Text>
-                    </View>
-                    <Switch
-                        value={availableToWork}
-                        onValueChange={setAvailableToWork}
-                        trackColor={{ false: '#767577', true: '#F4C430' }}
-                    />
+        <AppBody style={{ backgroundColor: theme.background, gap: 10 }}>
+            <TechnicianHeader title={t('settings.settings_title')} />
+            <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={styles.sectionTitle}>{t('settings.work_status')}</Text>
+                    {renderSettingItem(
+                        "clock-fast",
+                        t('settings.available_to_work'),
+                        undefined,
+                        <Switch
+                            value={availableToWork}
+                            onValueChange={setAvailableToWork}
+                            trackColor={{ false: '#767577', true: '#F4C430' }}
+                            thumbColor={availableToWork ? '#FFFFFF' : '#f4f3f4'}
+                        />
+                    )}
                 </View>
-            </View>
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
 
-            {/* Preferences */}
-            <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
-                <View style={styles.settingItem}>
-                    <View style={styles.settingLeft}>
-                        <MaterialCommunityIcons name="theme-light-dark" size={22} color={theme.iconColor} />
-                        <Text style={[styles.settingText, { color: theme.text }]}>{t('settings.dark_mode')}</Text>
-                    </View>
-                    <Switch
-                        value={isDarkMode}
-                        onValueChange={toggleTheme}
-                        trackColor={{ false: '#767577', true: '#F4C430' }}
-                    />
+                    {renderSettingItem(
+                        "account-edit",
+                        t('settings.edit_profile'),
+                        () => navigation?.navigate('EditProfile')
+                    )}
+
+                    {renderSettingItem(
+                        "wallet",
+                        t('settings.my_wallet'),
+                        () => navigation?.navigate('PaymentInfo')
+                    )}
+                    {renderSettingItem(
+                        "certificate",
+                        t('settings.my_certifications'),
+                        () => navigation?.navigate('MyCertifications')
+                    )}
                 </View>
 
-                <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-                    <View style={styles.settingLeft}>
-                        <MaterialCommunityIcons name="bell-outline" size={22} color={theme.iconColor} />
-                        <Text style={[styles.settingText, { color: theme.text }]}>{t('settings.job_notifications')}</Text>
-                    </View>
-                    <Switch
-                        value={notificationsEnabled}
-                        onValueChange={setNotificationsEnabled}
-                        trackColor={{ false: '#767577', true: '#F4C430' }}
-                    />
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
+                    {renderSettingItem(
+                        "theme-light-dark",
+                        t('settings.dark_mode'),
+                        undefined,
+                        <Switch
+                            value={isDarkMode}
+                            onValueChange={toggleTheme}
+                            trackColor={{ false: '#767577', true: '#F4C430' }}
+                            thumbColor={isDarkMode ? '#FFFFFF' : '#f4f3f4'}
+                        />
+                    )}
+                    {renderSettingItem(
+                        "bell-outline",
+                        t('settings.job_notifications'),
+                        undefined,
+                        <Switch
+                            value={notificationsEnabled}
+                            onValueChange={setNotificationsEnabled}
+                            trackColor={{ false: '#767577', true: '#F4C430' }}
+                            thumbColor={notificationsEnabled ? '#FFFFFF' : '#f4f3f4'}
+                        />
+                    )}
+                    {renderSettingItem(
+                        "translate",
+                        t('settings.language_title', 'Language'),
+                        () => navigation?.navigate('SettingsLanguage')
+                    )}
                 </View>
-            </View>
 
-            {/* Personal Details */}
-            <View style={[styles.section, { backgroundColor: theme.cardBackground }]}>
-                <Text style={styles.sectionTitle}>{t('settings.personal_details')}</Text>
-                <TouchableOpacity style={styles.settingItem}>
-                    <View style={styles.settingLeft}>
-                        <MaterialCommunityIcons name="account-edit" size={22} color={theme.iconColor} />
-                        <Text style={[styles.settingText, { color: theme.text }]}>{t('settings.edit_profile')}</Text>
-                    </View>
-                    <MaterialCommunityIcons name="chevron-right" size={22} color={theme.subText} />
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.settingItem, { borderBottomWidth: 0 }]}>
-                    <View style={styles.settingLeft}>
-                        <MaterialCommunityIcons name="bank" size={22} color={theme.iconColor} />
-                        <Text style={[styles.settingText, { color: theme.text }]}>{t('settings.payment_info')}</Text>
-                    </View>
-                    <MaterialCommunityIcons name="chevron-right" size={22} color={theme.subText} />
-                </TouchableOpacity>
-            </View>
+                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+                    <Text style={styles.sectionTitle}>{t('settings.help_support')}</Text>
+                    {renderSettingItem(
+                        "help-circle-outline",
+                        t('settings.help_support'),
+                        () => navigation?.navigate('HelpCenter')
+                    )}
+                    {renderSettingItem(
+                        "file-document-outline",
+                        t('settings.terms_privacy'),
+                        () => navigation?.navigate('TermsPrivacy')
+                    )}
+                </View>
 
-            {/* Logout */}
-            <TouchableOpacity
-                style={[styles.logoutButton, { backgroundColor: theme.cardBackground }]}
-                onPress={handleLogout}
-            >
-                <MaterialCommunityIcons name="logout" size={20} color="#FF3B30" />
-                <Text style={styles.logoutText}>{t('common.logout')}</Text>
-            </TouchableOpacity>
+                <View style={[styles.card, { backgroundColor: theme.cardBackground, marginBottom: 30 }]}>
+                    {renderSettingItem(
+                        "logout",
+                        t('common.logout'),
+                        handleLogout,
+                        undefined,
+                        true
+                    )}
+                </View>
 
-
-            <View style={{ height: 40 }} />
-        </ScrollView>
+                <View style={{ height: 100 }} />
+            </ScrollView>
         </AppBody>
     );
 }
@@ -130,59 +181,52 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
-    header: {
-        padding: 20,
-        marginBottom: 20,
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    section: {
-        marginBottom: 20,
-        paddingHorizontal: 20,
+    card: {
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        marginBottom: 16,
+        marginHorizontal: 20, // Increased specific unified margin
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
     },
     sectionTitle: {
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#8E8E93',
         marginTop: 16,
-        marginBottom: 12,
-        letterSpacing: 0.5,
+        marginBottom: 10,
+        marginLeft: 24, // Align with card content but offset for header
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+        fontFamily: typography.fontFamily,
     },
     settingItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F0F0F0',
+        paddingVertical: 14,
     },
     settingLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
+        flex: 1, // Ensure text takes available space
+    },
+    iconBox: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     settingText: {
-        fontSize: 16,
-    },
-    logoutButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        marginHorizontal: 20,
-        borderRadius: 12,
-        gap: 8,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    logoutText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#FF3B30',
+        fontSize: 15,
+        fontWeight: '500',
+        fontFamily: typography.fontFamily,
+        flex: 1, // distinct text wrapping
     },
 });

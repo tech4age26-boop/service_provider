@@ -1,17 +1,15 @@
-// TechnicianDashboard.tsx
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
-
-import { TechnicianOrdersScreen } from './screens/technician/TechnicianOrdersScreen';
-import { TechnicianServicesScreen } from './screens/technician/TechnicianServicesScreen';
-import { TechnicianSettingsScreen } from './screens/technician/TechnicianSettingsScreen';
-import { useTheme } from './App';
-import { TechnicianNavigation } from './navigation/technician/technician-navigation';
-import { TechnicianOrderNavigation } from './navigation/technician/technician-order.navigation';
+import { TechnicianNavigation } from '../navigation/technician/technician-navigation';
+import { TechnicianOrderNavigation } from '../navigation/technician/technician-order.navigation';
+import { TechnicianServicesScreen } from '../screens/technician/TechnicianServicesScreen';
+import { TechnicianSettingsStack } from '../navigation/technician/TechnicianSettingsStack';
+import { useTheme } from '../App'
 
 const Tab = createBottomTabNavigator();
 
@@ -50,9 +48,9 @@ function Tabs({ onLogout }: TechnicianDashboardProps) {
     >
       <Tab.Screen
         name="Home"
-        component={TechnicianNavigation} 
+        component={TechnicianNavigation}
         options={{
-          tabBarLabel: 'Dashboard',
+          tabBarLabel: t('common.dashboard'),
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="home" size={size} color={color} />
           ),
@@ -102,7 +100,7 @@ function Tabs({ onLogout }: TechnicianDashboardProps) {
           ),
         }}
       >
-        {(props) => <TechnicianSettingsScreen {...props} onLogout={onLogout} />}
+        {(props) => <TechnicianSettingsStack {...props} onLogout={onLogout} />}
       </Tab.Screen>
     </Tab.Navigator>
   );
@@ -111,9 +109,11 @@ function Tabs({ onLogout }: TechnicianDashboardProps) {
 export function TechnicianDashboard({ onLogout }: TechnicianDashboardProps) {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <Tabs onLogout={onLogout} />
-      </NavigationContainer>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <NavigationContainer>
+          <Tabs onLogout={onLogout} />
+        </NavigationContainer>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }
