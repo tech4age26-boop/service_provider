@@ -63,7 +63,7 @@ export const ServiceList = ({ data, onEdit, onDelete }: ServiceListProps) => {
                             </View>
                             <View style={styles.priceContainer}>
                                 <Text style={[styles.price, { color: theme.success }]}>{item.price}</Text>
-                                <Text style={[styles.currency, { color: theme.success }]}>SAR</Text>
+                                <Text style={[styles.currency, { color: theme.success }]}>{t('wallet.sar')}</Text>
                             </View>
                         </View>
 

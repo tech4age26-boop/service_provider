@@ -7,7 +7,7 @@ import { typography } from '../../../theme/typography';
 import { AuthInput } from '../components/AuthInput';
 import { AuthServiceSelector } from '../components/AuthServiceSelector';
 import { AuthImagePicker } from '../components/AuthImagePicker';
-import { AuthAddressSearch } from '../components/AuthAddressSearch';
+import { AuthLocationPicker } from '../components/AuthLocationPicker';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 interface TechnicianFormProps {
@@ -21,19 +21,23 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
     const [formData, setFormData] = useState({
         fullName: '',
         iqamaId: '',
+        drivingLicenseNumber: '',
         mobileNumber: '',
+        email: '',
         password: '',
         address: '',
         latitude: 0,
         longitude: 0,
         logo: null as string | null,
+        iqamaIdAttach: null as string | null,
+        drivingLicenseAttach: null as string | null,
         selectedServices: [] as string[],
         offersOutdoorServices: false,
     });
 
     const [showPassword, setShowPassword] = useState(false);
 
-    const handlePickImage = async () => {
+    const handlePickImage = async (field: 'logo' | 'iqamaIdAttach' | 'drivingLicenseAttach') => {
         const result = await launchImageLibrary({
             mediaType: 'photo',
             quality: 0.8,
@@ -41,7 +45,7 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
         });
 
         if (result.assets && result.assets[0]?.uri) {
-            setFormData({ ...formData, logo: result.assets[0].uri });
+            setFormData({ ...formData, [field]: result.assets[0].uri });
         }
     };
 
@@ -62,74 +66,124 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
 
             <View style={styles.header}>
                 <Text style={styles.title}>{t('registration.technician_details')}</Text>
-                <Text style={styles.subtitle}>{t('registration.technician_setup_subtitle') || "Setup your professional profile"}</Text>
+                <Text style={styles.subtitle}>{t('registration.technician_setup_subtitle')}</Text>
             </View>
 
             <View style={styles.form}>
-                <AuthInput
-                    label={t('registration.full_name')}
-                    placeholder={t('registration.full_name_placeholder') || "John Doe"}
-                    icon="account"
-                    value={formData.fullName}
-                    onChangeText={(text) => setFormData({ ...formData, fullName: text })}
-                />
-
-                <AuthInput
-                    label={t('registration.iqama_id')}
-                    placeholder="2xxxxxxxxxx"
-                    icon="card-account-details"
-                    keyboardType="numeric"
-                    value={formData.iqamaId}
-                    onChangeText={(text) => setFormData({ ...formData, iqamaId: text })}
-                />
-
-                <AuthInput
-                    label={t('auth.mobile')}
-                    placeholder="+966 50 000 0000"
-                    icon="phone"
-                    keyboardType="phone-pad"
-                    value={formData.mobileNumber}
-                    onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
-                />
-
-                <View style={styles.passwordWrapper}>
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('registration.personal_details')}</Text>
                     <AuthInput
-                        label={t('auth.password')}
-                        placeholder="••••••••"
-                        icon="lock-outline"
-                        secureTextEntry={!showPassword}
-                        value={formData.password}
-                        onChangeText={(text) => setFormData({ ...formData, password: text })}
+                        label={t('registration.full_name')}
+                        placeholder={t('registration.full_name_placeholder')}
+                        icon="account"
+                        value={formData.fullName}
+                        onChangeText={(text) => setFormData({ ...formData, fullName: text })}
                     />
-                    <TouchableOpacity
-                        style={styles.eyeIcon}
-                        onPress={() => setShowPassword(!showPassword)}>
-                        <MaterialCommunityIcons
-                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                            size={20}
-                            color={colors.subText}
+
+                    <View style={styles.row}>
+                        <View style={styles.flex1}>
+                            <AuthInput
+                                label={t('registration.iqama_id')}
+                                placeholder="2xxxxxxxxxx"
+                                icon="card-account-details"
+                                keyboardType="numeric"
+                                value={formData.iqamaId}
+                                onChangeText={(text) => setFormData({ ...formData, iqamaId: text })}
+                            />
+                        </View>
+                        <View style={styles.flex1}>
+                            <AuthInput
+                                label={t('registration.driving_license')}
+                                placeholder="1xxxxxxxxxx"
+                                icon="badge-account-horizontal"
+                                keyboardType="numeric"
+                                value={formData.drivingLicenseNumber}
+                                onChangeText={(text) => setFormData({ ...formData, drivingLicenseNumber: text })}
+                            />
+                        </View>
+                    </View>
+
+                    <AuthInput
+                        label={t('registration.email_optional')}
+                        placeholder="example@email.com"
+                        icon="email-outline"
+                        keyboardType="email-address"
+                        value={formData.email}
+                        onChangeText={(text) => setFormData({ ...formData, email: text })}
+                    />
+
+                    <View style={styles.loginIdWrapper}>
+                        <AuthInput
+                            label={t('auth.mobile')}
+                            placeholder="+966 50 000 0000"
+                            icon="phone"
+                            keyboardType="phone-pad"
+                            value={formData.mobileNumber}
+                            onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
                         />
-                    </TouchableOpacity>
+                        <View style={styles.loginIdNote}>
+                            <MaterialCommunityIcons name="information-outline" size={14} color={colors.primary} />
+                            <Text style={styles.loginIdText}>{t('registration.username_note')}</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.passwordWrapper}>
+                        <AuthInput
+                            label={t('auth.password')}
+                            placeholder="••••••••"
+                            icon="lock-outline"
+                            secureTextEntry={!showPassword}
+                            value={formData.password}
+                            onChangeText={(text) => setFormData({ ...formData, password: text })}
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(!showPassword)}>
+                            <MaterialCommunityIcons
+                                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                size={20}
+                                color={colors.subText}
+                            />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <AuthAddressSearch
-                    label={t('registration.address_label') || "Your Location"}
-                    addressQuery={formData.address}
-                    onAddressChange={(text) => setFormData({ ...formData, address: text })}
-                    onSelectSuggestion={(item) => setFormData({ 
-                        ...formData, 
-                        address: item.display_name,
-                        latitude: parseFloat(item.lat),
-                        longitude: parseFloat(item.lon)
-                    })}
-                />
+                <View style={styles.section}>
+                    <AuthLocationPicker
+                        label={t('registration.technician_address_label')}
+                        currentAddress={formData.address}
+                        onLocationDetected={(lat, lon, addr) => setFormData({ 
+                            ...formData, 
+                            latitude: lat, 
+                            longitude: lon, 
+                            address: addr 
+                        })}
+                    />
+                </View>
 
-                <AuthImagePicker
-                    label={t('registration.upload_photo')}
-                    imageUri={formData.logo}
-                    onPickImage={handlePickImage}
-                    placeholderIcon="account-circle-outline"
-                />
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('registration.attachments')}</Text>
+                    <View style={styles.attachmentGrid}>
+                        <AuthImagePicker
+                            label={t('registration.upload_photo')}
+                            imageUri={formData.logo}
+                            onPickImage={() => handlePickImage('logo')}
+                            placeholderIcon="account-circle-outline"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.iqama_id_attach')}
+                            imageUri={formData.iqamaIdAttach}
+                            onPickImage={() => handlePickImage('iqamaIdAttach')}
+                            placeholderIcon="card-account-details-outline"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.driving_license_attach')}
+                            imageUri={formData.drivingLicenseAttach}
+                            onPickImage={() => handlePickImage('drivingLicenseAttach')}
+                            placeholderIcon="license"
+                        />
+                    </View>
+                </View>
 
                 <AuthServiceSelector
                     selectedServices={formData.selectedServices}
@@ -168,7 +222,7 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
                     <View style={styles.trustLine} />
                     <View style={styles.trustBadge}>
                         <MaterialCommunityIcons name="shield-check" size={16} color={colors.primary} />
-                        <Text style={styles.trustText}>{t('registration.secure_verified') || "Secure & Verified Registration"}</Text>
+                        <Text style={styles.trustText}>{t('registration.secure_verified')}</Text>
                     </View>
                 </View>
 
@@ -236,7 +290,42 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     form: {
+        gap: 24,
+    },
+    section: {
         gap: 12,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: colors.text,
+        fontFamily: typography.fontFamily,
+        marginBottom: 4,
+        marginLeft: 4,
+    },
+    row: {
+        flexDirection: 'row',
+        gap: 16,
+    },
+    flex1: {
+        flex: 1,
+    },
+    loginIdWrapper: {
+        marginBottom: 8,
+    },
+    loginIdNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 6,
+        marginTop: -12, // Pull closer to input
+    },
+    loginIdText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: typography.fontFamily,
     },
     passwordWrapper: {
         position: 'relative',
@@ -246,6 +335,9 @@ const styles = StyleSheet.create({
         right: 18,
         top: 40,
         padding: 6,
+    },
+    attachmentGrid: {
+        gap: 0,
     },
     outdoorContainer: {
         backgroundColor: colors.white,
@@ -312,7 +404,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 40,
+        marginTop: 10,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.35,
@@ -343,7 +435,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     trustSection: {
-        marginTop: 32,
+        marginTop: 10,
         alignItems: 'center',
     },
     trustLine: {

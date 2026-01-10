@@ -90,33 +90,31 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
                     <View style={authStyles.formContainer}>
                         <View style={authStyles.inputWrapper}>
-                            <Text style={authStyles.inputLabel}>{t('auth.email')}</Text>
-                            <View style={authStyles.inputContainer}>
-                                <MaterialCommunityIcons
-                                    name="email-outline"
-                                    size={20}
-                                    color={colors.subText}
-                                    style={authStyles.inputIcon}
-                                />
-                                <TextInput
-                                    placeholder={t('auth.email_placeholder') || "Enter your email"}
-                                    placeholderTextColor={colors.subText}
-                                    style={authStyles.input}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
+                            <Text style={authStyles.inputLabel}>{t('auth.mobile')}</Text>
+                            <View style={authStyles.phoneInputGroup}>
+                                <View style={authStyles.countryCodeBadge}>
+                                    <Text style={authStyles.countryCodeText}>+966</Text>
+                                    <View style={authStyles.verticalDivider} />
+                                </View>
+                                <View style={authStyles.inputContainer}>
+                                    <TextInput
+                                        placeholder={t('auth.phone_placeholder') || "5xxxxxxxxx"}
+                                        placeholderTextColor={colors.subText}
+                                        style={authStyles.input}
+                                        keyboardType="phone-pad"
+                                        maxLength={9}
+                                    />
+                                </View>
+                            </View>
+                            <View style={authStyles.loginIdNote}>
+                                <MaterialCommunityIcons name="information-outline" size={14} color={colors.primary} />
+                                <Text style={authStyles.loginIdText}>{t('registration.username_note')}</Text>
                             </View>
                         </View>
 
-                            <View style={authStyles.inputWrapper}>
-                        <Text style={authStyles.inputLabel}>{t('auth.password')}</Text>
+                        <View style={authStyles.inputWrapper}>
+                            <Text style={authStyles.inputLabel}>{t('auth.password')}</Text>
                             <View style={authStyles.inputContainer}>
-                                <MaterialCommunityIcons
-                                    name="lock-outline"
-                                    size={20}
-                                    color={colors.subText}
-                                    style={authStyles.inputIcon}
-                                />
                                 <TextInput
                                     placeholder="••••••••"
                                     placeholderTextColor={colors.subText}
@@ -146,20 +144,24 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                             <View style={authStyles.buttonIconCircle}>
                                 <MaterialCommunityIcons
                                     name="arrow-right"
-                                    size={18}
+                                    size={20}
                                     color={colors.primary}
                                 />
                             </View>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={authStyles.technicianLink}
-                            onPress={() => setShowRegistration(true)}>
-                            <Text style={authStyles.technicianText}>
-                                {t('common.provider_question')}{' '}
-                                <Text style={authStyles.technicianLinkText}>{t('common.apply_here')}</Text>
+                        <View style={authStyles.registerSection}>
+                            <Text style={authStyles.dontHaveAccountText}>
+                                {t('auth.dont_have_account')}
                             </Text>
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={authStyles.registerLink}
+                                onPress={() => setShowRegistration(true)}>
+                                <Text style={authStyles.registerLinkText}>
+                                    {t('common.register')}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -175,143 +177,205 @@ const authStyles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
     },
     container: {
         flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
-        paddingHorizontal: 28,
+        paddingHorizontal: 30,
     },
     headerSection: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: 45,
     },
     logoBadge: {
         backgroundColor: colors.white,
-        paddingHorizontal: 24,
-        paddingVertical: 12,
-        borderRadius: 20,
-        marginBottom: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 15,
-        elevation: 10,
+        paddingHorizontal: 28,
+        paddingVertical: 14,
+        borderRadius: 24,
+        marginBottom: 28,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.12,
+        shadowRadius: 20,
+        elevation: 12,
     },
     logoText: {
-        fontSize: 32,
-        fontWeight: 'bold',
+        fontSize: 34,
+        fontWeight: '900',
         color: colors.primary,
-        letterSpacing: 4,
+        letterSpacing: 6,
         fontFamily: typography.fontFamily,
     },
     welcomeTitle: {
-        fontSize: 28,
-        fontWeight: '800',
+        fontSize: 30,
+        fontWeight: '900',
         color: colors.text,
-        marginBottom: 8,
+        marginBottom: 10,
         fontFamily: typography.fontFamily,
+        letterSpacing: -0.5,
     },
     tagline: {
-        fontSize: 14,
+        fontSize: 15,
         color: colors.subText,
-        fontWeight: '500',
-        letterSpacing: 0.5,
+        fontWeight: '600',
+        letterSpacing: 0.3,
         fontFamily: typography.fontFamily,
+        textAlign: 'center',
+        paddingHorizontal: 20,
+        lineHeight: 20,
     },
     formContainer: {
-        gap: 20,
+        gap: 24,
     },
     inputWrapper: {
-        gap: 8,
+        gap: 10,
     },
     inputLabel: {
-        fontSize: 14,
-        fontWeight: '700',
+        fontSize: 15,
+        fontWeight: '800',
         color: colors.text,
         marginLeft: 4,
         fontFamily: typography.fontFamily,
+        letterSpacing: 0.5,
     },
-    inputContainer: {
+    phoneInputGroup: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    countryCodeBadge: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: colors.white,
-        borderRadius: 16,
+        borderRadius: 18,
         paddingHorizontal: 16,
-        height: 60,
-        borderWidth: 1,
+        height: 64,
+        borderWidth: 1.5,
         borderColor: colors.border,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.02,
-        shadowRadius: 8,
+        shadowOpacity: 0.03,
+        shadowRadius: 10,
         elevation: 2,
     },
-    inputIcon: {
-        marginRight: 12,
+    countryCodeText: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: colors.text,
+        fontFamily: typography.fontFamily,
+        marginRight: 10,
+    },
+    verticalDivider: {
+        width: 1.5,
+        height: 24,
+        backgroundColor: colors.border,
+    },
+    inputContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.white,
+        borderRadius: 18,
+        paddingHorizontal: 18,
+        height: 64,
+        borderWidth: 1.5,
+        borderColor: colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.03,
+        shadowRadius: 10,
+        elevation: 2,
     },
     input: {
         flex: 1,
         fontSize: 16,
         color: colors.text,
         fontFamily: typography.fontFamily,
+        fontWeight: '600',
+    },
+    loginIdNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        gap: 6,
+        marginTop: -4,
+    },
+    loginIdText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: typography.fontFamily,
     },
     eyeIcon: {
-        padding: 4,
+        padding: 6,
     },
     forgotPassword: {
         alignSelf: 'flex-end',
-        marginTop: -4,
+        marginTop: -6,
     },
     forgotPasswordText: {
         fontSize: 14,
         color: colors.subText,
-        fontWeight: '600',
+        fontWeight: '700',
         fontFamily: typography.fontFamily,
     },
     loginButton: {
         backgroundColor: colors.primary,
-        borderRadius: 18,
-        height: 60,
+        borderRadius: 22,
+        height: 68,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: 10,
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 15,
+        elevation: 10,
     },
     loginButtonText: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '900',
         color: colors.secondary,
-        marginRight: 12,
+        marginRight: 14,
         fontFamily: typography.fontFamily,
+        letterSpacing: 0.5,
     },
     buttonIconCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         backgroundColor: colors.secondary,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
     },
-    technicianLink: {
+    registerSection: {
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         marginTop: 20,
-        marginBottom: 20,
+        marginBottom: 30,
+        gap: 8,
     },
-    technicianText: {
+    dontHaveAccountText: {
         fontSize: 14,
         color: colors.subText,
         fontFamily: typography.fontFamily,
+        fontWeight: '500',
     },
-    technicianLinkText: {
+    registerLink: {
+        paddingVertical: 4,
+    },
+    registerLinkText: {
         color: colors.primary,
-        fontWeight: '700',
+        fontWeight: '800',
+        fontSize: 15,
+        fontFamily: typography.fontFamily,
     },
 });

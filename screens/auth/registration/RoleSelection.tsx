@@ -21,7 +21,7 @@ export const RoleSelection = ({ onSelect, onBack }: RoleSelectionProps) => {
 
             <View style={styles.header}>
                 <Text style={styles.title}>{t('common.register')}</Text>
-                <Text style={styles.subtitle}>{t('registration.role_selection_subtitle') || "Choose how you want to join our platform"}</Text>
+                <Text style={styles.subtitle}>{t('registration.role_selection_subtitle')}</Text>
             </View>
 
             <View style={styles.cardsContainer}>
@@ -34,7 +34,7 @@ export const RoleSelection = ({ onSelect, onBack }: RoleSelectionProps) => {
                     </View>
                     <View style={styles.cardContent}>
                         <Text style={styles.cardTitle}>{t('registration.type_workshop')}</Text>
-                        <Text style={styles.cardDescription}>{t('registration.workshop_desc') || "For established auto centers and service workshops"}</Text>
+                        <Text style={styles.cardDescription}>{t('registration.workshop_desc')}</Text>
                     </View>
                     <View style={styles.arrowCircle}>
                         <MaterialCommunityIcons name="chevron-right" size={20} color={colors.subText} />
@@ -50,7 +50,7 @@ export const RoleSelection = ({ onSelect, onBack }: RoleSelectionProps) => {
                     </View>
                     <View style={styles.cardContent}>
                         <Text style={styles.cardTitle}>{t('registration.type_individual')}</Text>
-                        <Text style={styles.cardDescription}>{t('registration.individual_desc') || "For freelance mechanics and mobile technicians"}</Text>
+                        <Text style={styles.cardDescription}>{t('registration.individual_desc')}</Text>
                     </View>
                     <View style={styles.arrowCircle}>
                         <MaterialCommunityIcons name="chevron-right" size={20} color={colors.subText} />

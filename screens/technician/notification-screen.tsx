@@ -14,6 +14,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import TechnicianHeader from '../../components/technician_header/technician-header';
 import { colors } from '../../theme/colors';
 
+import { useTranslation } from 'react-i18next';
+
 interface Notification {
   id: string;
   title: string;
@@ -29,6 +31,7 @@ interface NotificationScreenProps {
 
 export function NotificationScreen({ navigation }: NotificationScreenProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
@@ -39,13 +42,23 @@ export function NotificationScreen({ navigation }: NotificationScreenProps) {
     const demoNotifications: Notification[] = [
       {
         id: '1',
+        title: t('status.next_task'), 
+        message: 'You have a new task: Brake Service at Al Olaya, Riyadh.',
+        time: '10 mins ago',
+        type: 'info',
+        read: false,
+      },
+    ];
+    const demo: Notification[] = [
+        {
+        id: '1',
         title: 'New Task Assigned',
         message: 'You have a new task: Brake Service at Al Olaya, Riyadh.',
         time: '10 mins ago',
         type: 'info',
         read: false,
       },
-      {
+       {
         id: '2',
         title: 'Task Completed',
         message: 'Task "Battery Replacement" has been marked as completed.',
@@ -53,24 +66,8 @@ export function NotificationScreen({ navigation }: NotificationScreenProps) {
         type: 'success',
         read: false,
       },
-      {
-        id: '3',
-        title: 'Schedule Change',
-        message: 'Task "Oil Change" has been rescheduled to 5:00 PM.',
-        time: 'Yesterday',
-        type: 'alert',
-        read: true,
-      },
-      {
-        id: '4',
-        title: 'Reminder',
-        message: 'You have an upcoming task: AC Repair at Riyadh Center.',
-        time: 'Tomorrow 4:30 PM',
-        type: 'info',
-        read: true,
-      },
     ];
-    setNotifications(demoNotifications);
+     setNotifications(demo);
   };
 
   const handleDeleteNotification = (id: string) => {
@@ -81,15 +78,15 @@ export function NotificationScreen({ navigation }: NotificationScreenProps) {
     if (notifications.length === 0) return;
 
     Alert.alert(
-      'Clear All Notifications',
-      'Are you sure you want to clear all notifications?',
+      t('settings.notifications_page.clear_confirm_title'),
+      t('settings.notifications_page.clear_confirm_msg'),
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Clear All',
+          text: t('settings.notifications_page.clear_all'),
           style: 'destructive',
           onPress: () => setNotifications([]),
         },
@@ -116,10 +113,12 @@ export function NotificationScreen({ navigation }: NotificationScreenProps) {
     };
   };
 
+  // ...
+
   return (
     <AppBody style={[styles.container, { backgroundColor: theme.background }]}>
       <TechnicianHeader
-        title="Notifications"
+        title={t('settings.notifications_page.title')}
         onBackPress={() => navigation.goBack()}
         rightComponent={
           notifications.length > 0 ? (
@@ -137,10 +136,10 @@ export function NotificationScreen({ navigation }: NotificationScreenProps) {
               <MaterialCommunityIcons name="bell-off-outline" size={48} color={theme.subText} />
             </View>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>
-              No Notifications
+              {t('settings.notifications_page.empty_title')}
             </Text>
             <Text style={[styles.emptyText, { color: theme.subText }]}>
-              You're all caught up! No new notifications.
+              {t('settings.notifications_page.empty_msg')}
             </Text>
           </View>
         ) : (

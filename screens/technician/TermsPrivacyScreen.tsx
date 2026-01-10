@@ -23,24 +23,24 @@ export function TermsPrivacyScreen({ navigation }: any) {
 
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={[styles.heading, { color: theme.text }]}>1. Introduction</Text>
+                    <Text style={[styles.heading, { color: theme.text }]}>{t('settings.intro_title')}</Text>
                     <Text style={[styles.paragraph, { color: theme.subText }]}>
-                        Welcome to Filter. By using our application, you agree to these Terms and Conditions. Please read them carefully.
+                        {t('settings.intro_content')}
                     </Text>
 
-                    <Text style={[styles.heading, { color: theme.text }]}>2. Service Usage</Text>
+                    <Text style={[styles.heading, { color: theme.text }]}>{t('settings.usage_title')}</Text>
                     <Text style={[styles.paragraph, { color: theme.subText }]}>
-                        Technicians are expected to provide high-quality service and maintain professional conduct at all times. Failure to do so may result in account suspension.
+                        {t('settings.usage_content')}
                     </Text>
 
-                    <Text style={[styles.heading, { color: theme.text }]}>3. Payments</Text>
+                    <Text style={[styles.heading, { color: theme.text }]}>{t('settings.payment_terms_title')}</Text>
                     <Text style={[styles.paragraph, { color: theme.subText }]}>
-                        Payments are processed securely. Filter takes a commission on each completed job. Payouts are made weekly.
+                        {t('settings.payment_terms_content')}
                     </Text>
 
-                    <Text style={[styles.heading, { color: theme.text }]}>4. Privacy Policy</Text>
+                    <Text style={[styles.heading, { color: theme.text }]}>{t('settings.privacy_policy_title')}</Text>
                     <Text style={[styles.paragraph, { color: theme.subText }]}>
-                        We value your privacy. Your personal data is only used for order processing and service improvement. We do not sell your data to third parties.
+                        {t('settings.privacy_policy_content')}
                     </Text>
                 </View>
                 <View style={{ height: 40 }} />

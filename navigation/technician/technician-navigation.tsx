@@ -4,6 +4,8 @@ import { TechnicianHomeScreen } from '../../screens/technician/TechnicianHomeScr
 import { TaskDetailScreen } from '../../screens/technician/task-details.screen';
 import { NotificationScreen } from '../../screens/technician/notification-screen';
 import { TechnicianOrdersScreen } from '../../screens/technician/TechnicianOrdersScreen';
+import { TechnicianFeedbackScreen } from '../../screens/technician/TechnicianFeedbackScreen';
+import { PaymentInfoScreen } from '../../screens/technician/PaymentInfoScreen';
 
 interface Task {
   id: string;
@@ -20,6 +22,8 @@ export type TechnicianStackParamList = {
   TaskDetailScreen: { task: Task };
   Notification: undefined;
   TechnicianOrdersScreen: undefined;
+  TechnicianFeedback: { task: Task };
+  PaymentInfo: undefined;
 };
 
 const Stack = createNativeStackNavigator<TechnicianStackParamList>();
@@ -35,6 +39,8 @@ export function TechnicianNavigation() {
       <Stack.Screen name="TechnicianHome" component={TechnicianHomeScreen} />
       <Stack.Screen name="TaskDetailScreen" component={TaskDetailScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
+      <Stack.Screen name="TechnicianFeedback" component={TechnicianFeedbackScreen} />
+      <Stack.Screen name="PaymentInfo" component={PaymentInfoScreen} />
     </Stack.Navigator>
   );
 }

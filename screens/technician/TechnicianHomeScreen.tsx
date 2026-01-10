@@ -43,6 +43,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showBalance, setShowBalance] = useState(false);
 
   useEffect(() => {
     loadUserData();
@@ -67,7 +68,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
     const demoTasks: Task[] = [
       {
         id: '1',
-        service: 'Brake Service',
+        service: t('services.brake_service'),
         customer: 'Ali Khan',
         location: 'Al Olaya, Riyadh',
         eta: '15 mins',
@@ -75,7 +76,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
       },
       {
         id: '2',
-        service: 'Battery Replacement',
+        service: t('services.battery_replacement'),
         customer: 'David Wilson',
         location: 'King Fahd Rd, Riyadh',
         scheduled: '4:30 PM',
@@ -83,7 +84,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
       },
       {
         id: '3',
-        service: 'Oil Change',
+        service: t('services.oil_change'),
         customer: 'Fatima Zahra',
         location: 'Olaya District',
         scheduled: 'Yesterday',
@@ -91,7 +92,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
       },
       {
         id: '4',
-        service: 'AC Repair',
+        service: t('services.ac_repair'),
         customer: 'Mohammed Ali',
         location: 'Riyadh Center',
         scheduled: 'Yesterday',
@@ -201,12 +202,21 @@ export function TechnicianHomeScreen({ navigation }: Props) {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[styles.notificationIcon, { backgroundColor: theme.inputBackground }]}
-          onPress={() => navigation.navigate('Notification')}
-        >
-          <FontAwesome5 name="bell" size={20} color={theme.text} solid />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <TouchableOpacity
+            style={[styles.walletButton, { backgroundColor: theme.inputBackground }]}
+            onPress={() => navigation.navigate('PaymentInfo')}
+          >
+            <MaterialCommunityIcons name="wallet-outline" size={20} color={theme.text} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.notificationIcon, { backgroundColor: theme.inputBackground }]}
+            onPress={() => navigation.navigate('Notification')}
+          >
+            <FontAwesome5 name="bell" size={20} color={theme.text} solid />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -215,6 +225,26 @@ export function TechnicianHomeScreen({ navigation }: Props) {
       >
         {/* Enhanced Stats Cards */}
         <View style={styles.statsGrid}>
+          {/* Wallet Balance Card (New) */}
+          <View style={[styles.statCard, { backgroundColor: theme.cardBackground, width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={[styles.statIconContainer, { backgroundColor: theme.inputBackground, marginRight: 16, marginBottom: 0 }]}>
+                    <MaterialCommunityIcons name="wallet" size={24} color={colors.primary} />
+                </View>
+                <View>
+                    <Text style={[styles.statLabel, { color: theme.subText, textAlign: 'left' }]}>
+                        {t('home.wallet_balance')}
+                    </Text>
+                    <Text style={[styles.statNumber, { color: theme.text, fontSize: 22 }]}>
+                        {showBalance ? `1,250.00 ${t('wallet.sar')}` : '••••••'}
+                    </Text>
+                </View>
+            </View>
+            <TouchableOpacity onPress={() => setShowBalance(!showBalance)} style={{ padding: 8 }}>
+                <MaterialCommunityIcons name={showBalance ? "eye-off" : "eye"} size={20} color={theme.subText} />
+            </TouchableOpacity>
+          </View>
+
           {/* Today's Earnings */}
           <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
             <View style={[styles.statIconContainer, { backgroundColor: colors.successLight }]}>
@@ -222,7 +252,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
             </View>
             <Text style={[styles.statNumber, { color: theme.text }]}>1,250</Text>
             <Text style={[styles.statLabel, { color: theme.subText }]}>
-              {t('home.earnings_today')} SAR
+              {t('home.earnings_today')} {t('wallet.sar')}
             </Text>
           </View>
 
@@ -340,6 +370,18 @@ const styles = StyleSheet.create({
     ...typography.subheader,
   },
   notificationIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  walletButton: {
     width: 44,
     height: 44,
     borderRadius: 22,

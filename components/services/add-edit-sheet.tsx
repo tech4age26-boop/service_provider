@@ -29,34 +29,34 @@ interface AddEditSheetProps {
 }
 
 const SERVICE_CATEGORIES = [
-    'Diagnostics',
-    'Quick Service',
-    'Tuning',
-    'Detailing',
-    'Oil Change',
-    'Tires & Alignment',
-    'Engine',
-    'Electrical',
-    'Other',
+    'diagnostics',
+    'quick_service',
+    'tuning',
+    'detailing',
+    'oil_change',
+    'tire_alignment',
+    'engine',
+    'electrical',
+    'other',
 ];
 
 const PRODUCT_CATEGORIES = [
-    'Brake Pads',
-    'Filters',
-    'Fluids',
-    'Tires',
-    'Accessories',
-    'Engine Parts',
-    'Tools',
+    'brake_pads',
+    'filters',
+    'fluids',
+    'tires',
+    'accessories',
+    'engine_parts',
+    'tools',
 ];
 
 const UOM_OPTIONS = [
-    'Pcs',
-    'Litre',
-    'Kgs',
-    'Box',
-    'Carton',
-    'Bermil',
+    'pcs',
+    'litre',
+    'kgs',
+    'box',
+    'carton',
+    'bermil',
 ];
 
 export const AddEditSheet = ({
@@ -75,6 +75,16 @@ export const AddEditSheet = ({
     const [formData, setFormData] = useState<Partial<Service>>({});
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const [isUomOpen, setIsUomOpen] = useState(false);
+
+    // Dynamic Lists State
+    const [productCategories, setProductCategories] = useState(PRODUCT_CATEGORIES);
+    const [uomOptions, setUomOptions] = useState(UOM_OPTIONS);
+
+    // Adding New Item State
+    const [isAddingCategory, setIsAddingCategory] = useState(false);
+    const [newCategory, setNewCategory] = useState('');
+    const [isAddingUom, setIsAddingUom] = useState(false);
+    const [newUom, setNewUom] = useState('');
 
     useEffect(() => {
         if (visible) {
@@ -186,7 +196,7 @@ export const AddEditSheet = ({
                     <View style={styles.rowInputs}>
                         <View style={{ flex: 1, marginRight: 10 }}>
                             <CustomInput
-                                label={type === 'product' ? "Selling Price (SAR)" : `${t('products.price')} (SAR)`}
+                                label={type === 'product' ? `${t('products.selling_price')} (${t('wallet.sar')})` : `${t('products.price')} (${t('wallet.sar')})`}
                                 required
                                 value={formData.price}
                                 onChangeText={(text) => setFormData({ ...formData, price: text })}
@@ -198,7 +208,7 @@ export const AddEditSheet = ({
                         {type === 'product' && (
                             <View style={{ flex: 1 }}>
                                 <CustomInput
-                                    label="Purchase Price (SAR)"
+                                    label={`${t('products.purchase_price')} (${t('wallet.sar')})`}
                                     required
                                     value={formData.purchasePrice}
                                     onChangeText={(text) => setFormData({ ...formData, purchasePrice: text })}
@@ -235,45 +245,95 @@ export const AddEditSheet = ({
                                 />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <Text style={[styles.label, { color: theme.text, marginTop: 12 }]}>UOM</Text>
-                                <TouchableOpacity
-                                    style={[
-                                        styles.dropdown,
-                                        { backgroundColor: theme.inputBackground, borderColor: theme.border, paddingVertical: 12 },
-                                    ]}
-                                    onPress={() => setIsUomOpen(!isUomOpen)}
-                                >
-                                    <Text style={{ color: formData.uom ? theme.text : theme.subText, fontSize: 14 }}>
-                                        {formData.uom || 'Select'}
-                                    </Text>
-                                    <MaterialCommunityIcons
-                                        name={isUomOpen ? 'chevron-up' : 'chevron-down'}
-                                        size={18}
-                                        color={theme.subText}
-                                    />
-                                </TouchableOpacity>
-                                {isUomOpen && (
-                                    <View
-                                        style={[
-                                            styles.dropdownList,
-                                            { backgroundColor: theme.inputBackground, borderColor: theme.border, position: 'absolute', top: 75, left: 0, right: 0, zIndex: 1000 },
-                                        ]}
-                                    >
-                                        <ScrollView style={{ maxHeight: 150 }}>
-                                            {UOM_OPTIONS.map((opt) => (
-                                                <TouchableOpacity
-                                                    key={opt}
-                                                    style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
-                                                    onPress={() => {
-                                                        setFormData({ ...formData, uom: opt });
-                                                        setIsUomOpen(false);
-                                                    }}
-                                                >
-                                                    <Text style={{ color: theme.text }}>{opt}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
+                                <Text style={[styles.label, { color: theme.text, marginTop: 12 }]}>{t('products.uom')}</Text>
+                                {isAddingUom ? (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <View style={{ flex: 1 }}>
+                                            <CustomInput
+                                                value={newUom}
+                                                onChangeText={setNewUom}
+                                                placeholder={t('products.enter_uom')}
+                                                style={{ marginTop: 0 }}
+                                            />
+                                        </View>
+                                        <TouchableOpacity 
+                                            style={[styles.saveSmallBtn, { backgroundColor: theme.tint }]}
+                                            onPress={() => {
+                                                if (newUom.trim()) {
+                                                    const cleanUom = newUom.trim().replace(/\s+/g, '_').toLowerCase();
+                                                    if (!uomOptions.includes(cleanUom)) {
+                                                        setUomOptions([...uomOptions, cleanUom]);
+                                                    }
+                                                    setFormData({ ...formData, uom: cleanUom });
+                                                    setNewUom('');
+                                                    setIsAddingUom(false);
+                                                }
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons name="check" size={18} color="#000" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity 
+                                            style={[styles.saveSmallBtn, { backgroundColor: theme.inputBackground, borderWidth: 1, borderColor: theme.border }]}
+                                            onPress={() => {
+                                                setIsAddingUom(false);
+                                                setNewUom('');
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons name="close" size={18} color={theme.text} />
+                                        </TouchableOpacity>
                                     </View>
+                                ) : (
+                                    <>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.dropdown,
+                                                { backgroundColor: theme.inputBackground, borderColor: theme.border, paddingVertical: 12 },
+                                            ]}
+                                            onPress={() => setIsUomOpen(!isUomOpen)}
+                                        >
+                                            <Text style={{ color: formData.uom ? theme.text : theme.subText, fontSize: 14 }}>
+                                                {formData.uom ? (uomOptions.includes(formData.uom) ? t(`products.uom_options.${formData.uom}`) : formData.uom) : t('products.select')}
+                                            </Text>
+                                            <MaterialCommunityIcons
+                                                name={isUomOpen ? 'chevron-up' : 'chevron-down'}
+                                                size={18}
+                                                color={theme.subText}
+                                            />
+                                        </TouchableOpacity>
+                                        {isUomOpen && (
+                                            <View
+                                                style={[
+                                                    styles.dropdownList,
+                                                    { backgroundColor: theme.inputBackground, borderColor: theme.border, position: 'absolute', top: 75, left: 0, right: 0, zIndex: 1000 },
+                                                ]}
+                                            >
+                                                <ScrollView style={{ maxHeight: 150 }} nestedScrollEnabled>
+                                                    {uomOptions.map((opt) => (
+                                                        <TouchableOpacity
+                                                            key={opt}
+                                                            style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                            onPress={() => {
+                                                                setFormData({ ...formData, uom: opt });
+                                                                setIsUomOpen(false);
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: theme.text }}>{t(`products.uom_options.${opt}`) !== `products.uom_options.${opt}` ? t(`products.uom_options.${opt}`) : opt}</Text>
+                                                        </TouchableOpacity>
+                                                    ))}
+                                                    <TouchableOpacity
+                                                        style={[styles.dropdownItem, { borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+                                                        onPress={() => {
+                                                            setIsUomOpen(false);
+                                                            setIsAddingUom(true);
+                                                        }}
+                                                    >
+                                                        <MaterialCommunityIcons name="plus" size={16} color={theme.tint} />
+                                                        <Text style={{ color: theme.tint, fontWeight: '700' }}>{t('common.add_new')}</Text>
+                                                    </TouchableOpacity>
+                                                </ScrollView>
+                                            </View>
+                                        )}
+                                    </>
                                 )}
                             </View>
                         </View>
@@ -283,42 +343,92 @@ export const AddEditSheet = ({
                     {type === 'product' && (
                         <>
                             <Text style={[styles.label, { color: theme.text }]}>{t('products.category')}</Text>
-                            <TouchableOpacity
-                                style={[
-                                    styles.dropdown,
-                                    { backgroundColor: theme.inputBackground, borderColor: theme.border },
-                                ]}
-                                onPress={() => setIsCategoryOpen(!isCategoryOpen)}
-                            >
-                                <Text style={{ color: formData.subCategory ? theme.text : theme.subText }}>
-                                    {formData.subCategory || t('products.select_category')}
-                                </Text>
-                                <MaterialCommunityIcons
-                                    name={isCategoryOpen ? 'chevron-up' : 'chevron-down'}
-                                    size={20}
-                                    color={theme.subText}
-                                />
-                            </TouchableOpacity>
-                            {isCategoryOpen && (
-                                <View
-                                    style={[
-                                        styles.dropdownList,
-                                        { backgroundColor: theme.inputBackground, borderColor: theme.border },
-                                    ]}
-                                >
-                                    {PRODUCT_CATEGORIES.map((cat) => (
-                                        <TouchableOpacity
-                                            key={cat}
-                                            style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
-                                            onPress={() => {
-                                                setFormData({ ...formData, subCategory: cat });
-                                                setIsCategoryOpen(false);
-                                            }}
-                                        >
-                                            <Text style={{ color: theme.text }}>{cat}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                            {isAddingCategory ? (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                    <View style={{ flex: 1 }}>
+                                        <CustomInput
+                                            value={newCategory}
+                                            onChangeText={setNewCategory}
+                                            placeholder={t('products.enter_category')}
+                                            style={{ marginTop: 0 }}
+                                        />
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={[styles.saveSmallBtn, { backgroundColor: theme.tint }]}
+                                        onPress={() => {
+                                            if (newCategory.trim()) {
+                                                const cleanCat = newCategory.trim().replace(/\s+/g, '_').toLowerCase();
+                                                if (!productCategories.includes(cleanCat)) {
+                                                    setProductCategories([...productCategories, cleanCat]);
+                                                }
+                                                setFormData({ ...formData, subCategory: cleanCat });
+                                                setNewCategory('');
+                                                setIsAddingCategory(false);
+                                            }
+                                        }}
+                                    >
+                                        <MaterialCommunityIcons name="check" size={18} color="#000" />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={[styles.saveSmallBtn, { backgroundColor: theme.inputBackground, borderWidth: 1, borderColor: theme.border }]}
+                                        onPress={() => {
+                                            setIsAddingCategory(false);
+                                            setNewCategory('');
+                                        }}
+                                    >
+                                        <MaterialCommunityIcons name="close" size={18} color={theme.text} />
+                                    </TouchableOpacity>
                                 </View>
+                            ) : (
+                                <>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.dropdown,
+                                            { backgroundColor: theme.inputBackground, borderColor: theme.border },
+                                        ]}
+                                        onPress={() => setIsCategoryOpen(!isCategoryOpen)}
+                                    >
+                                        <Text style={{ color: formData.subCategory ? theme.text : theme.subText }}>
+                                            {formData.subCategory ? (productCategories.includes(formData.subCategory) ? t(`products.categories.${formData.subCategory}`) : formData.subCategory.replace(/_/g, ' ')) : t('products.select_category')}
+                                        </Text>
+                                        <MaterialCommunityIcons
+                                            name={isCategoryOpen ? 'chevron-up' : 'chevron-down'}
+                                            size={20}
+                                            color={theme.subText}
+                                        />
+                                    </TouchableOpacity>
+                                    {isCategoryOpen && (
+                                        <View
+                                            style={[
+                                                styles.dropdownList,
+                                                { backgroundColor: theme.inputBackground, borderColor: theme.border },
+                                            ]}
+                                        >
+                                            {productCategories.map((cat) => (
+                                                <TouchableOpacity
+                                                    key={cat}
+                                                    style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                    onPress={() => {
+                                                        setFormData({ ...formData, subCategory: cat });
+                                                        setIsCategoryOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={{ color: theme.text }}>{t(`products.categories.${cat}`) !== `products.categories.${cat}` ? t(`products.categories.${cat}`) : cat.replace(/_/g, ' ')}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                            <TouchableOpacity
+                                                style={[styles.dropdownItem, { borderBottomColor: theme.border, flexDirection: 'row', alignItems: 'center', gap: 6 }]}
+                                                onPress={() => {
+                                                    setIsCategoryOpen(false);
+                                                    setIsAddingCategory(true);
+                                                }}
+                                            >
+                                                <MaterialCommunityIcons name="plus" size={16} color={theme.tint} />
+                                                <Text style={{ color: theme.tint, fontWeight: '700' }}>{t('common.add_new')}</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    )}
+                                </>
                             )}
                             <CustomInput
                                 label={t('products.company_name')}
@@ -339,7 +449,7 @@ export const AddEditSheet = ({
                     {type === 'service' && (
                         <>
                             <Text style={[styles.label, { color: theme.text }]}>
-                                Service Types
+                                {t('products.service_types')}
                             </Text>
                             <View style={styles.chipContainer}>
                                 {SERVICE_CATEGORIES.map((cat) => {
@@ -364,20 +474,20 @@ export const AddEditSheet = ({
                                                     { color: isSelected ? '#1C1C1E' : theme.text },
                                                 ]}
                                             >
-                                                {cat}
+                                                {t(`products.categories.${cat}`)}
                                             </Text>
                                         </TouchableOpacity>
                                     );
                                 })}
                             </View>
 
-                            {formData.serviceTypes?.includes('Other') && (
+                            {formData.serviceTypes?.includes('other') && (
                                 <CustomInput
-                                    label="Other Service Name"
+                                    label={t('products.other_service_name')}
                                     required
                                     value={formData.otherServiceName || ''}
                                     onChangeText={(text) => setFormData({ ...formData, otherServiceName: text })}
-                                    placeholder="Enter service name"
+                                    placeholder={t('products.enter_service_name')}
                                 />
                             )}
                         </>
@@ -611,5 +721,12 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         color: '#1C1C1E',
+    },
+    saveSmallBtn: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });

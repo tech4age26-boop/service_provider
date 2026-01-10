@@ -18,15 +18,17 @@ export function HelpCenterScreen({ navigation }: any) {
     const { t } = useTranslation();
 
     const faqItems = [
-        { id: '1', question: 'How do I accept a new job?', answer: 'When a new job appears in your "Active Orders" tab, simply tap "Accept" to start the process.' },
-        { id: '2', question: 'How do payouts work?', answer: 'Payouts are processed weekly to your bank account or STC Pay wallet.' },
-        { id: '3', question: 'Can I change my service radius?', answer: 'Yes, go to Settings > Location & Radius to adjust your coverage area.' },
+        { id: '1', question: t('faq.q1'), answer: t('faq.a1') },
+        { id: '2', question: t('faq.q2'), answer: t('faq.a2') },
+        { id: '3', question: t('faq.q3'), answer: t('faq.a3') },
+        { id: '4', question: t('faq.q4'), answer: t('faq.a4') },
+        { id: '5', question: t('faq.q5'), answer: t('faq.a5') },
     ];
 
     const contactMethods = [
-        { id: 'chat', icon: 'chat-processing', title: 'Live Chat', subtitle: 'Chat with support team' },
-        { id: 'email', icon: 'email-outline', title: 'Send Email', subtitle: 'support@filter.sa' },
-        { id: 'phone', icon: 'phone-outline', title: 'Call Us', subtitle: '+966 800 123 4567' },
+        { id: 'chat', icon: 'chat-processing', title: t('settings.live_chat'), subtitle: t('settings.chat_subtitle') },
+        { id: 'email', icon: 'email-outline', title: t('settings.send_email'), subtitle: 'support@filter.sa' },
+        { id: 'phone', icon: 'phone-outline', title: t('settings.call_us'), subtitle: '+966 800 123 4567' },
     ];
 
     return (
@@ -34,7 +36,7 @@ export function HelpCenterScreen({ navigation }: any) {
             <SettingsHeader title={t('settings.help_support')} />
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Contact Support</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('settings.contact_support')}</Text>
                 <View style={styles.contactGrid}>
                     {contactMethods.map((method) => (
                         <TouchableOpacity key={method.id} style={[styles.contactCard, { backgroundColor: theme.cardBackground }]}>
@@ -50,7 +52,7 @@ export function HelpCenterScreen({ navigation }: any) {
                     ))}
                 </View>
 
-                <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 12 }]}>Frequently Asked Questions</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 12 }]}>{t('settings.faq')}</Text>
                 {faqItems.map((item) => (
                     <View key={item.id} style={[styles.faqCard, { backgroundColor: theme.cardBackground }]}>
                         <Text style={[styles.faqQuestion, { color: theme.text }]}>{item.question}</Text>

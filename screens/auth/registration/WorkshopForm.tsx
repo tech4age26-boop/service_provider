@@ -7,7 +7,7 @@ import { typography } from '../../../theme/typography';
 import { AuthInput } from '../components/AuthInput';
 import { AuthServiceSelector } from '../components/AuthServiceSelector';
 import { AuthImagePicker } from '../components/AuthImagePicker';
-import { AuthAddressSearch } from '../components/AuthAddressSearch';
+import { AuthLocationPicker } from '../components/AuthLocationPicker';
 import { launchImageLibrary } from 'react-native-image-picker';
 
 interface WorkshopFormProps {
@@ -29,13 +29,15 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
         latitude: 0,
         longitude: 0,
         logo: null as string | null,
+        vatCertificate: null as string | null,
+        crDocument: null as string | null,
         selectedServices: [] as string[],
         offersOutdoorServices: false,
     });
 
     const [showPassword, setShowPassword] = useState(false);
 
-    const handlePickImage = async () => {
+    const handlePickImage = async (field: 'logo' | 'vatCertificate' | 'crDocument') => {
         const result = await launchImageLibrary({
             mediaType: 'photo',
             quality: 0.8,
@@ -43,7 +45,7 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
         });
 
         if (result.assets && result.assets[0]?.uri) {
-            setFormData({ ...formData, logo: result.assets[0].uri });
+            setFormData({ ...formData, [field]: result.assets[0].uri });
         }
     };
 
@@ -64,96 +66,126 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
 
             <View style={styles.header}>
                 <Text style={styles.title}>{t('registration.workshop_details')}</Text>
-                <Text style={styles.subtitle}>{t('registration.workshop_setup_subtitle') || "Complete your business profile"}</Text>
+                <Text style={styles.subtitle}>{t('registration.workshop_setup_subtitle')}</Text>
             </View>
 
             <View style={styles.form}>
-                <AuthInput
-                    label={t('registration.workshop_name')}
-                    placeholder={t('registration.workshop_name_placeholder') || "AutoFix Pro Center"}
-                    icon="store"
-                    value={formData.workshopName}
-                    onChangeText={(text) => setFormData({ ...formData, workshopName: text })}
-                />
-
-                <AuthInput
-                    label={t('registration.owner_name')}
-                    placeholder={t('registration.owner_name_placeholder') || "Alex Johnson"}
-                    icon="account"
-                    value={formData.ownerName}
-                    onChangeText={(text) => setFormData({ ...formData, ownerName: text })}
-                />
-
-                <View style={styles.row}>
-                    <View style={styles.flex1}>
-                        <AuthInput
-                            label={t('registration.cr_number')}
-                            placeholder="1234567890"
-                            icon="file-document-outline"
-                            keyboardType="numeric"
-                            value={formData.crNumber}
-                            onChangeText={(text) => setFormData({ ...formData, crNumber: text })}
-                        />
-                    </View>
-                    <View style={styles.flex1}>
-                        <AuthInput
-                            label={t('registration.vat_number')}
-                            placeholder="321654987"
-                            icon="receipt"
-                            keyboardType="numeric"
-                            value={formData.vatNumber}
-                            onChangeText={(text) => setFormData({ ...formData, vatNumber: text })}
-                        />
-                    </View>
-                </View>
-
-                <AuthInput
-                    label={t('auth.mobile')}
-                    placeholder="+966 50 000 0000"
-                    icon="phone"
-                    keyboardType="phone-pad"
-                    value={formData.mobileNumber}
-                    onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
-                />
-
-                <View style={styles.passwordWrapper}>
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('registration.business_details')}</Text>
                     <AuthInput
-                        label={t('auth.password')}
-                        placeholder="••••••••"
-                        icon="lock-outline"
-                        secureTextEntry={!showPassword}
-                        value={formData.password}
-                        onChangeText={(text) => setFormData({ ...formData, password: text })}
+                        label={t('registration.workshop_name')}
+                        placeholder={t('registration.workshop_name_placeholder')}
+                        icon="store"
+                        value={formData.workshopName}
+                        onChangeText={(text) => setFormData({ ...formData, workshopName: text })}
                     />
-                    <TouchableOpacity
-                        style={styles.eyeIcon}
-                        onPress={() => setShowPassword(!showPassword)}>
-                        <MaterialCommunityIcons
-                            name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                            size={20}
-                            color={colors.subText}
-                        />
-                    </TouchableOpacity>
+
+                    <View style={styles.row}>
+                        <View style={styles.flex1}>
+                            <AuthInput
+                                label={t('registration.cr_number')}
+                                placeholder="1234567890"
+                                icon="file-document-outline"
+                                keyboardType="numeric"
+                                value={formData.crNumber}
+                                onChangeText={(text) => setFormData({ ...formData, crNumber: text })}
+                            />
+                        </View>
+                        <View style={styles.flex1}>
+                            <AuthInput
+                                label={t('registration.vat_number')}
+                                placeholder="321654987"
+                                icon="receipt"
+                                keyboardType="numeric"
+                                value={formData.vatNumber}
+                                onChangeText={(text) => setFormData({ ...formData, vatNumber: text })}
+                            />
+                        </View>
+                    </View>
                 </View>
 
-                <AuthAddressSearch
-                    label={t('registration.address_label') || "Workshop Location"}
-                    addressQuery={formData.address}
-                    onAddressChange={(text) => setFormData({ ...formData, address: text })}
-                    onSelectSuggestion={(item) => setFormData({ 
-                        ...formData, 
-                        address: item.display_name,
-                        latitude: parseFloat(item.lat),
-                        longitude: parseFloat(item.lon)
-                    })}
-                />
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('registration.personal_details')}</Text>
+                    <AuthInput
+                        label={t('registration.owner_name')}
+                        placeholder={t('registration.owner_name_placeholder')}
+                        icon="account"
+                        value={formData.ownerName}
+                        onChangeText={(text) => setFormData({ ...formData, ownerName: text })}
+                    />
 
-                <AuthImagePicker
-                    label={t('registration.upload_logo')}
-                    imageUri={formData.logo}
-                    onPickImage={handlePickImage}
-                    placeholderIcon="store-search"
-                />
+                    <View style={styles.loginIdWrapper}>
+                        <AuthInput
+                            label={t('auth.mobile')}
+                            placeholder="+966 50 000 0000"
+                            icon="phone"
+                            keyboardType="phone-pad"
+                            value={formData.mobileNumber}
+                            onChangeText={(text) => setFormData({ ...formData, mobileNumber: text })}
+                        />
+                        <View style={styles.loginIdNote}>
+                            <MaterialCommunityIcons name="information-outline" size={14} color={colors.primary} />
+                            <Text style={styles.loginIdText}>{t('registration.username_note')}</Text>
+                        </View>
+                    </View>
+
+                    <View style={styles.passwordWrapper}>
+                        <AuthInput
+                            label={t('auth.password')}
+                            placeholder="••••••••"
+                            icon="lock-outline"
+                            secureTextEntry={!showPassword}
+                            value={formData.password}
+                            onChangeText={(text) => setFormData({ ...formData, password: text })}
+                        />
+                        <TouchableOpacity
+                            style={styles.eyeIcon}
+                            onPress={() => setShowPassword(!showPassword)}>
+                            <MaterialCommunityIcons
+                                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                size={20}
+                                color={colors.subText}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <AuthLocationPicker
+                        label={t('registration.address_label')}
+                        currentAddress={formData.address}
+                        onLocationDetected={(lat, lon, addr) => setFormData({ 
+                            ...formData, 
+                            latitude: lat, 
+                            longitude: lon, 
+                            address: addr 
+                        })}
+                    />
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>{t('registration.attachments')}</Text>
+                    <View style={styles.attachmentGrid}>
+                        <AuthImagePicker
+                            label={t('registration.upload_logo')}
+                            imageUri={formData.logo}
+                            onPickImage={() => handlePickImage('logo')}
+                            placeholderIcon="store-search"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.vat_certificate_attach')}
+                            imageUri={formData.vatCertificate}
+                            onPickImage={() => handlePickImage('vatCertificate')}
+                            placeholderIcon="file-certificate"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.cr_attach')}
+                            imageUri={formData.crDocument}
+                            onPickImage={() => handlePickImage('crDocument')}
+                            placeholderIcon="file-document-outline"
+                        />
+                    </View>
+                </View>
 
                 <AuthServiceSelector
                     selectedServices={formData.selectedServices}
@@ -192,7 +224,7 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
                     <View style={styles.trustLine} />
                     <View style={styles.trustBadge}>
                         <MaterialCommunityIcons name="shield-check" size={16} color={colors.primary} />
-                        <Text style={styles.trustText}>{t('registration.secure_verified') || "Secure & Verified Registration"}</Text>
+                        <Text style={styles.trustText}>{t('registration.secure_verified')}</Text>
                     </View>
                 </View>
 
@@ -260,7 +292,18 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     form: {
+        gap: 24,
+    },
+    section: {
         gap: 12,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: colors.text,
+        fontFamily: typography.fontFamily,
+        marginBottom: 4,
+        marginLeft: 4,
     },
     row: {
         flexDirection: 'row',
@@ -268,6 +311,23 @@ const styles = StyleSheet.create({
     },
     flex1: {
         flex: 1,
+    },
+    loginIdWrapper: {
+        marginBottom: 8,
+    },
+    loginIdNote: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        gap: 6,
+        marginTop: -12, // Pull closer to input
+    },
+    loginIdText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: typography.fontFamily,
     },
     passwordWrapper: {
         position: 'relative',
@@ -277,6 +337,9 @@ const styles = StyleSheet.create({
         right: 18,
         top: 40,
         padding: 6,
+    },
+    attachmentGrid: {
+        gap: 0,
     },
     outdoorContainer: {
         backgroundColor: colors.white,
@@ -343,7 +406,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginTop: 40,
+        marginTop: 10,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.35,
@@ -374,7 +437,7 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
     },
     trustSection: {
-        marginTop: 32,
+        marginTop: 10,
         alignItems: 'center',
     },
     trustLine: {

@@ -78,13 +78,13 @@ export const ProductList = ({ data, onEdit, onDelete }: ProductListProps) => {
                                     </Text>
                                     <View style={styles.companyRow}>
                                         <MaterialCommunityIcons name="domain" size={12} color={theme.subText} />
-                                        <Text style={styles.companyText}> {item.company || 'Generic'}</Text>
+                                        <Text style={styles.companyText}> {item.company || t('products.generic')}</Text>
                                     </View>
                                 </View>
                                 <View style={styles.priceContainer}>
                                     <Text style={[styles.price, { color: theme.tint }]}>
                                         {item.price}
-                                        <Text style={[styles.currency, { color: theme.text }]}> SAR</Text>
+                                        <Text style={[styles.currency, { color: theme.text }]}> {t('wallet.sar')}</Text>
                                     </Text>
                                 </View>
                             </View>
@@ -93,7 +93,7 @@ export const ProductList = ({ data, onEdit, onDelete }: ProductListProps) => {
 
                             <View style={styles.detailsRow}>
                                 <View style={[styles.skuBadge, { backgroundColor: theme.inputBackground }]}>
-                                    <Text style={[styles.skuText, { color: theme.subText }]}>SKU: {item.sku || 'N/A'}</Text>
+                                    <Text style={[styles.skuText, { color: theme.subText }]}>{t('products.sku_label')}: {item.sku || 'N/A'}</Text>
                                 </View>
 
                                 <View style={[
@@ -111,7 +111,7 @@ export const ProductList = ({ data, onEdit, onDelete }: ProductListProps) => {
                                         styles.stockText,
                                         { color: isOutOfStock ? colors.danger : isLowStock ? colors.warning : colors.success }
                                     ]}>
-                                        {' '}{isOutOfStock ? 'Out of Stock' : `${item.stock || 0} in stock`}
+                                        {' '}{isOutOfStock ? t('products.out_of_stock') : `${item.stock || 0} ${t('products.in_stock')}`}
                                     </Text>
                                 </View>
                             </View>
@@ -119,7 +119,7 @@ export const ProductList = ({ data, onEdit, onDelete }: ProductListProps) => {
                             <View style={styles.footerRow}>
                                 <View style={[styles.categoryTag, { borderColor: theme.border }]}>
                                     <Text style={[styles.categoryText, { color: theme.subText }]}>
-                                        {item.subCategory || 'General'}
+                                        {item.subCategory || t('products.general')}
                                     </Text>
                                 </View>
 

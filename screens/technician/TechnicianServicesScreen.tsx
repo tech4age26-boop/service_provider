@@ -27,20 +27,20 @@ export function TechnicianServicesScreen() {
   const [services, setServices] = useState<Service[]>([
     {
       id: '1',
-      name: 'Roadside Assistance',
+      name: t('services.roadside_assistance'),
       price: '150',
       duration: '45',
       category: 'service',
-      serviceTypes: ['Roadside Assistance', 'Tire Repair'],
+      serviceTypes: [t('services.roadside_assistance'), t('services.tire_service')],
       status: 'active',
     },
     {
       id: '2',
-      name: 'Oil Change',
+      name: t('services.oil_change'),
       price: '80',
       duration: '30',
       category: 'service',
-      serviceTypes: ['Oil Change'],
+      serviceTypes: [t('services.oil_change')],
       status: 'active',
     },
   ]);

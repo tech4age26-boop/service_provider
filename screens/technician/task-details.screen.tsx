@@ -8,10 +8,12 @@ import {
   Linking,
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
+import { useTranslation } from 'react-i18next';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppBody from '../../components/app_body/app-body';
 import TechnicianHeader from '../../components/technician_header/technician-header';
+import { colors } from '../../theme/colors';
 
 interface Task {
   id: string;
@@ -36,15 +38,16 @@ interface TaskDetailProps {
 
 export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const task = route?.params?.task;
 
   // Safety check for task data
   if (!task) {
     return (
       <AppBody style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ fontSize: 16, color: theme.text }}>Task not found</Text>
+        <Text style={{ fontSize: 16, color: theme.text }}>{t('technician.task_not_found')}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
-          <Text style={{ color: '#007AFF' }}>Go Back</Text>
+          <Text style={{ color: '#007AFF' }}>{t('technician.go_back')}</Text>
         </TouchableOpacity>
       </AppBody>
     );
@@ -71,18 +74,7 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
 
   return (
     <AppBody style={[styles.container, { backgroundColor: theme.background }]}>
-      {/* Header
-      <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <FontAwesome5 name="arrow-left" size={22} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Task Details
-        </Text>
-        <View style={{ width: 22 }} /> 
-      </View> */}
-
-      <TechnicianHeader title="Task Details" onBackPress={() => { navigation.goBack() }} />
+      <TechnicianHeader title={t('technician.task_details')} onBackPress={() => { navigation.goBack() }} />
 
       <ScrollView style={styles.content}>
         {/* Task Info */}
@@ -99,7 +91,7 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
                 styles.statusText,
                 { color: task.status === 'completed' ? '#155724' : task.status === 'next' ? '#0C5460' : '#856404' }
               ]}>
-                {task.status === 'completed' ? 'Completed' : task.status === 'next' ? 'Next Task' : 'Active'}
+                {task.status === 'completed' ? t('status.completed') : task.status === 'next' ? t('status.next_task') : t('status.active')}
               </Text>
             </View>
           </View>
@@ -107,14 +99,14 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
           <View style={styles.infoRow}>
             <MaterialCommunityIcons name="account" size={20} color="#F4C430" />
             <Text style={[styles.infoText, { color: theme.text }]}>
-              Customer: {task.customer}
+              {t('common.customer')}: {task.customer}
             </Text>
           </View>
 
           <View style={styles.infoRow}>
             <FontAwesome5 name="map-marker-alt" size={20} color="#007AFF" />
             <Text style={[styles.infoText, { color: theme.text }]}>
-              Location: {task.location}
+              {t('common.location')}: {task.location}
             </Text>
           </View>
 
@@ -122,7 +114,7 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
             <View style={styles.infoRow}>
               <FontAwesome5 name="clock" size={20} color="#FFB800" />
               <Text style={[styles.infoText, { color: theme.text }]}>
-                ETA: {task.eta}
+                {t('common.eta')}: {task.eta}
               </Text>
             </View>
           )}
@@ -131,35 +123,105 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
             <View style={styles.infoRow}>
               <FontAwesome5 name="calendar-alt" size={20} color="#2ECC71" />
               <Text style={[styles.infoText, { color: theme.text }]}>
-                Scheduled: {task.scheduled}
+                {t('common.scheduled')}: {task.scheduled}
               </Text>
             </View>
           )}
 
           <TouchableOpacity style={styles.mapButton} onPress={openMaps}>
             <FontAwesome5 name="map-marked-alt" size={18} color="#FFF" />
-            <Text style={styles.mapButtonText}>View on Map</Text>
+            <Text style={styles.mapButtonText}>{t('technician.view_on_map')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Steps</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('technician.task_steps')}</Text>
           <View style={styles.checklistItem}>
-            <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
-            <Text style={[styles.checkText, { color: theme.text }]}>Arrive at customer location</Text>
+            {task.status === 'completed' ? (
+              <MaterialCommunityIcons name="check-circle" size={20} color="#2ECC71" />
+            ) : (
+              <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
+            )}
+            <Text style={[styles.checkText, { color: theme.text }]}>{t('technician.arrive_location')}</Text>
           </View>
           <View style={styles.checklistItem}>
-            <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
-            <Text style={[styles.checkText, { color: theme.text }]}>Perform service: {task.service}</Text>
+            {task.status === 'completed' ? (
+              <MaterialCommunityIcons name="check-circle" size={20} color="#2ECC71" />
+            ) : (
+              <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
+            )}
+            <Text style={[styles.checkText, { color: theme.text }]}>{t('technician.perform_service')}: {task.service}</Text>
           </View>
           <View style={styles.checklistItem}>
-            <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
-            <Text style={[styles.checkText, { color: theme.text }]}>Verify and complete</Text>
+            {task.status === 'completed' ? (
+              <MaterialCommunityIcons name="check-circle" size={20} color="#2ECC71" />
+            ) : (
+              <MaterialCommunityIcons name="checkbox-blank-circle-outline" size={20} color="#F4C430" />
+            )}
+            <Text style={[styles.checkText, { color: theme.text }]}>{t('technician.verify_complete')}</Text>
           </View>
         </View>
 
+        {/* Bill Summary Section */}
         <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Customer Review</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('technician.bill_summary')}</Text>
+          
+          {/* Service Item */}
+          <View style={styles.billRow}>
+            <Text style={[styles.billItemText, { color: theme.text }]}>{task.service}</Text>
+            <Text style={[styles.billItemPrice, { color: theme.text }]}>
+              {(() => {
+                const getPrice = (s: string) => {
+                   if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
+                   if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
+                   if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
+                   return 200; // Default
+                };
+                const price = getPrice(task.service);
+                return `${price} ${t('wallet.sar')}`;
+              })()}
+            </Text>
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+          {/* Calculations */}
+          {(() => {
+             const getPrice = (s: string) => {
+                if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
+                if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
+                if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
+                return 200;
+             };
+             const price = getPrice(task.service);
+             const fees = price * 0.10;
+             const net = price - fees;
+             
+             return (
+               <>
+                 <View style={styles.billRow}>
+                   <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.item_total')}</Text>
+                   <Text style={[styles.billValue, { color: theme.text }]}>{price} {t('wallet.sar')}</Text>
+                 </View>
+                 <View style={styles.billRow}>
+                   <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.platform_fees')} (10%)</Text>
+                   <Text style={[styles.billValue, { color: '#FF3B30' }]}>-{fees.toFixed(0)} {t('wallet.sar')}</Text>
+                 </View>
+
+                 <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+                 <View style={styles.billRow}>
+                   <Text style={[styles.billLabelBold, { color: theme.text }]}>{t('technician.net_earnings')}</Text>
+                   <Text style={[styles.billValueBold, { color: '#34C759' }]}>{net.toFixed(0)} {t('wallet.sar')}</Text>
+                 </View>
+                 <Text style={[styles.vatNote, { color: theme.subText }]}>{t('technician.vat_included')}</Text>
+               </>
+             );
+          })()}
+        </View>
+
+        <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('technician.customer_review')}</Text>
           <View style={styles.reviewRow}>
             <FontAwesome5 name="star" size={16} color="#FFB800" />
             <Text style={[styles.reviewRating, { color: theme.text }]}>
@@ -172,15 +234,22 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
         </View>
 
         <View style={styles.actionContainer}>
-          {task.status !== 'completed' && (
+          {task.status !== 'completed' ? (
             <>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#2ECC71' }]}>
-                <Text style={styles.actionButtonText}>Start Task</Text>
+                <Text style={styles.actionButtonText}>{t('technician.start_task')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#F4C430' }]}>
-                <Text style={styles.actionButtonText}>Mark as Completed</Text>
+                <Text style={styles.actionButtonText}>{t('technician.mark_completed')}</Text>
               </TouchableOpacity>
             </>
+          ) : (
+            <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: colors.primary, marginHorizontal: 0 }]}
+                onPress={() => navigation.navigate('TechnicianFeedback', { task })}
+            >
+                <Text style={styles.actionButtonText}>{t('technician.give_feedback')}</Text>
+            </TouchableOpacity>
           )}
         </View>
       </ScrollView>
@@ -227,4 +296,13 @@ const styles = StyleSheet.create({
   actionContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 12 },
   actionButton: { flex: 1, padding: 14, borderRadius: 12, alignItems: 'center', marginHorizontal: 4 },
   actionButtonText: { color: '#1C1C1E', fontWeight: '600' as const },
+  billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' },
+  billItemText: { fontSize: 16, fontWeight: '500' as const },
+  billItemPrice: { fontSize: 16, fontWeight: '600' as const },
+  divider: { height: 1, marginVertical: 12 },
+  billLabel: { fontSize: 14 },
+  billValue: { fontSize: 14, fontWeight: '500' as const },
+  billLabelBold: { fontSize: 16, fontWeight: 'bold' as const },
+  billValueBold: { fontSize: 16, fontWeight: 'bold' as const },
+  vatNote: { fontSize: 12, marginTop: 8, textAlign: 'right', fontStyle: 'italic' as const },
 });

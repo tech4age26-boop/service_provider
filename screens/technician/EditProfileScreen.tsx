@@ -74,7 +74,7 @@ export function EditProfileScreen({ navigation }: any) {
                             <MaterialCommunityIcons name="pencil" size={14} color="#FFF" />
                         </View>
                     </TouchableOpacity>
-                    <Text style={[styles.changePhotoText, { color: theme.tint }]}>{t('registration.change_photo')}</Text>
+                    <Text style={[styles.changePhotoText, { color: theme.tint }]}>{t('settings.change_photo')}</Text>
                 </View>
 
                 {/* Personal Info */}

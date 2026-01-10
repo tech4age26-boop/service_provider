@@ -24,13 +24,14 @@ interface TechnicianOrder {
     vehicle: string;
     time: string;
     status: string;
+    rawStatus: 'active' | 'next' | 'completed';
     statusColor: string;
     amount?: string;
 }
 
 interface TechnicianOrdersScreenProps {
     navigation: {
-        navigate: (screen: string, params: { task: TechnicianOrder }) => void;
+        navigate: (screen: string, params: { task: any }) => void;
     };
 }
 
@@ -57,6 +58,7 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
             vehicle: 'Toyota Camry 2023',
             time: 'ASAP', 
             status: t('status.in_transit'), 
+            rawStatus: 'active',
             statusColor: '#FF9500' 
         },
         { 
@@ -68,6 +70,7 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
             vehicle: 'Lexus RX 2022',
             time: '11:30 AM', 
             status: t('status.pending'), 
+            rawStatus: 'next',
             statusColor: '#007AFF' 
         },
     ];
@@ -78,9 +81,10 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
             service: t('services.battery_replacement'), 
             customer: 'Ahmed Al-Saud', 
             time: 'Today, 9:00 AM', 
-            amount: 'SR 450', 
+            amount: `${t('wallet.sar')} 450`, 
             vehicle: 'BMW X5 2021',
             status: t('status.completed'),
+            rawStatus: 'completed',
             statusColor: '#34C759' 
         },
         { 
@@ -88,9 +92,10 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
             service: t('services.brake_service'), 
             customer: 'Fahad Mohammed', 
             time: 'Yesterday', 
-            amount: 'SR 320', 
+            amount: `${t('wallet.sar')} 320`, 
             vehicle: 'Honda Accord 2020',
             status: t('status.completed'),
+            rawStatus: 'completed',
             statusColor: '#34C759' 
         },
     ];
@@ -174,7 +179,14 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
                             key={order.id} 
                             activeOpacity={0.9}
                             style={[styles.orderCard, { backgroundColor: theme.cardBackground }]} 
-                            onPress={() => navigation.navigate('TaskDetailScreen', { task: order })}
+                            onPress={() => navigation.navigate('TaskDetailScreen', { 
+                                task: {
+                                    ...order,
+                                    status: order.rawStatus,
+                                    scheduled: order.time,
+                                    location: order.location || 'Riyadh', // Fallback
+                                }
+                            })}
                         >
                             <View style={styles.orderHeader}>
                                 <View>
@@ -232,12 +244,12 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
                                         <MaterialCommunityIcons name="navigation-variant" size={18} color="#1E88E5" />
                                         <Text style={[styles.actionButtonText, { color: '#1E88E5' }]}>{t('technician.navigate')}</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity 
+                                    {/* <TouchableOpacity 
                                         style={[styles.actionButton, { backgroundColor: '#F2F2F7' }]}
                                         onPress={() => navigation.navigate('TaskDetailScreen', { task: order })}
                                     >
                                         <Text style={[styles.actionButtonText, { color: '#8E8E93' }]}>{t('technician.details')}</Text>
-                                    </TouchableOpacity>
+                                    </TouchableOpacity> */}
                                 </View>
                             )}
                         </TouchableOpacity>

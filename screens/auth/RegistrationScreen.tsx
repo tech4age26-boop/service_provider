@@ -5,6 +5,8 @@ import {
     ImageBackground,
     Alert,
     Animated,
+    Text,
+    TouchableOpacity,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +15,7 @@ import { RoleSelection } from './registration/RoleSelection';
 import { WorkshopForm } from './registration/WorkshopForm';
 import { TechnicianForm } from './registration/TechnicianForm';
 import { colors } from '../../theme/colors';
+import { typography } from '../../theme/typography';
 
 interface RegistrationScreenProps {
     onBack: () => void;
@@ -191,6 +194,13 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
                         />
                     )}
                 </Animated.View>
+
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>{t('auth.already_registered')} </Text>
+                    <TouchableOpacity onPress={onBack}>
+                        <Text style={styles.signInText}>{t('auth.sign_in')}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         </ImageBackground>
     );
@@ -250,5 +260,21 @@ const styles = StyleSheet.create({
     },
     progressLineActive: {
         backgroundColor: colors.primary,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 20,
+    },
+    footerText: {
+        ...typography.body,
+        color: colors.subText,
+    },
+    signInText: {
+        ...typography.body,
+        color: colors.primary,
+        fontFamily: typography.header.fontFamily,
+        fontWeight: '700',
     },
 });
