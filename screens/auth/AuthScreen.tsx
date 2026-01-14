@@ -10,6 +10,8 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    ActivityIndicator,
+    Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -26,11 +28,58 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onLogin }: AuthScreenProps) {
+    const [selectedRole, setSelectedRole] = useState<'owner' | 'technician' | 'cashier' | 'individual'>('owner');
+    const [phone, setPhone] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showRegistration, setShowRegistration] = useState(true);
     const [dashboardType, setDashboardType] = useState<'provider' | 'technician' | null>(null);
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
+
+    const API_BASE_URL = 'https://filter-server.vercel.app';
+
+    const handleLogin = async () => {
+        if (!phone || !password) {
+            Alert.alert('Error', 'Please enter both phone and password');
+            return;
+        }
+
+        setIsLoggingIn(true);
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phone: `+966${phone}`,
+                    password: password,
+                    role: selectedRole
+                }),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                await AsyncStorage.setItem('user_data', JSON.stringify(result.user));
+                onLogin();
+            } else {
+                Alert.alert('Login Failed', result.message || 'Invalid credentials');
+            }
+        } catch (error) {
+            console.error('Login Error:', error);
+            Alert.alert('Error', 'Network or server error. Please try again.');
+        } finally {
+            setIsLoggingIn(false);
+        }
+    };
+
+    const roles_list = [
+        { id: 'owner', label: 'Workshop Owner', icon: 'store' },
+        { id: 'technician', label: 'Technician', icon: 'wrench' },
+        { id: 'cashier', label: 'Cashier', icon: 'cash-register' },
+        { id: 'individual', label: 'Freelancer', icon: 'account-wrench' },
+    ];
 
     if (dashboardType === 'provider') {
         return <ProviderDashboard onLogout={() => setDashboardType(null)} />;
@@ -77,7 +126,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 <ScrollView
                     contentContainerStyle={[
                         authStyles.scrollContent,
-                        { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 },
+                        { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 20 },
                     ]}
                     showsVerticalScrollIndicator={false}>
                     <View style={authStyles.headerSection}>
@@ -89,6 +138,34 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                     </View>
 
                     <View style={authStyles.formContainer}>
+                        {/* Role Selection */}
+                        <View style={authStyles.inputWrapper}>
+                            <Text style={authStyles.inputLabel}>Select Login Role</Text>
+                            <View style={authStyles.roleGrid}>
+                                {roles_list.map((r) => (
+                                    <TouchableOpacity
+                                        key={r.id}
+                                        style={[
+                                            authStyles.roleCard,
+                                            selectedRole === r.id && authStyles.roleCardActive
+                                        ]}
+                                        onPress={() => setSelectedRole(r.id as any)}>
+                                        <MaterialCommunityIcons
+                                            name={r.icon}
+                                            size={22}
+                                            color={selectedRole === r.id ? colors.secondary : colors.primary}
+                                        />
+                                        <Text style={[
+                                            authStyles.roleCardText,
+                                            selectedRole === r.id && authStyles.roleCardTextActive
+                                        ]}>
+                                            {r.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </View>
+
                         <View style={authStyles.inputWrapper}>
                             <Text style={authStyles.inputLabel}>{t('auth.mobile')}</Text>
                             <View style={authStyles.phoneInputGroup}>
@@ -103,12 +180,10 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                                         style={authStyles.input}
                                         keyboardType="phone-pad"
                                         maxLength={9}
+                                        value={phone}
+                                        onChangeText={setPhone}
                                     />
                                 </View>
-                            </View>
-                            <View style={authStyles.loginIdNote}>
-                                <MaterialCommunityIcons name="information-outline" size={14} color={colors.primary} />
-                                <Text style={authStyles.loginIdText}>{t('registration.username_note')}</Text>
                             </View>
                         </View>
 
@@ -120,6 +195,8 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                                     placeholderTextColor={colors.subText}
                                     style={authStyles.input}
                                     secureTextEntry={!showPassword}
+                                    value={password}
+                                    onChangeText={setPassword}
                                 />
                                 <TouchableOpacity
                                     style={authStyles.eyeIcon}
@@ -139,15 +216,24 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={authStyles.loginButton} onPress={onLogin}>
-                            <Text style={authStyles.loginButtonText}>{t('common.login')}</Text>
-                            <View style={authStyles.buttonIconCircle}>
-                                <MaterialCommunityIcons
-                                    name="arrow-right"
-                                    size={20}
-                                    color={colors.primary}
-                                />
-                            </View>
+                        <TouchableOpacity
+                            style={[authStyles.loginButton, isLoggingIn && { opacity: 0.7 }]}
+                            onPress={handleLogin}
+                            disabled={isLoggingIn}>
+                            {isLoggingIn ? (
+                                <ActivityIndicator color={colors.secondary} />
+                            ) : (
+                                <>
+                                    <Text style={authStyles.loginButtonText}>{t('common.login')}</Text>
+                                    <View style={authStyles.buttonIconCircle}>
+                                        <MaterialCommunityIcons
+                                            name="arrow-right"
+                                            size={20}
+                                            color={colors.primary}
+                                        />
+                                    </View>
+                                </>
+                            )}
                         </TouchableOpacity>
 
                         <View style={authStyles.registerSection}>
@@ -377,5 +463,41 @@ const authStyles = StyleSheet.create({
         fontWeight: '800',
         fontSize: 15,
         fontFamily: typography.fontFamily,
+    },
+    roleGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginTop: 4,
+    },
+    roleCard: {
+        width: '48%',
+        backgroundColor: colors.white,
+        borderRadius: 15,
+        paddingVertical: 14,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1.5,
+        borderColor: colors.border,
+        gap: 8,
+    },
+    roleCardActive: {
+        backgroundColor: colors.primary,
+        borderColor: colors.primary,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    roleCardText: {
+        fontSize: 13,
+        fontWeight: '700',
+        color: colors.text,
+        textAlign: 'center',
+    },
+    roleCardTextActive: {
+        color: colors.secondary,
     },
 });

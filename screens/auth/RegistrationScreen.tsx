@@ -55,7 +55,7 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
     const insets = useSafeAreaInsets();
     const [step, setStep] = useState<'role' | 'workshop' | 'technician'>('role');
     const [isLoading, setIsLoading] = useState(false);
-    
+
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -104,12 +104,20 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
                 data.append('crNumber', formData.crNumber);
                 data.append('vatNumber', formData.vatNumber);
                 data.append('mobileNumber', formData.mobileNumber);
-                
+
                 if (formData.logo) {
                     data.append('logo', {
                         uri: formData.logo,
                         type: 'image/jpeg',
                         name: 'logo.jpg',
+                    } as any);
+                }
+
+                if (formData.frontPhoto) {
+                    data.append('frontPhoto', {
+                        uri: formData.frontPhoto,
+                        type: 'image/jpeg',
+                        name: 'front.jpg',
                     } as any);
                 }
             } else {
@@ -122,6 +130,14 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
                         uri: formData.logo,
                         type: 'image/jpeg',
                         name: 'profile.jpg',
+                    } as any);
+                }
+
+                if (formData.frontPhoto) {
+                    data.append('frontPhoto', {
+                        uri: formData.frontPhoto,
+                        type: 'image/jpeg',
+                        name: 'front.jpg',
                     } as any);
                 }
             }
@@ -166,29 +182,29 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
             <View style={styles.overlay} />
             <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
                 <ProgressIndicator currentStep={step === 'role' ? 1 : 2} />
-                
+
                 <Animated.View style={[
-                    styles.animatedContent, 
+                    styles.animatedContent,
                     { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
                 ]}>
                     {step === 'role' && (
-                        <RoleSelection 
-                            onSelect={handleRoleSelect} 
-                            onBack={onBack} 
+                        <RoleSelection
+                            onSelect={handleRoleSelect}
+                            onBack={onBack}
                         />
                     )}
-                    
+
                     {step === 'workshop' && (
-                        <WorkshopForm 
-                            onSubmit={handleRegister} 
+                        <WorkshopForm
+                            onSubmit={handleRegister}
                             onBack={handleBackToRole}
                             isLoading={isLoading}
                         />
                     )}
 
                     {step === 'technician' && (
-                        <TechnicianForm 
-                            onSubmit={handleRegister} 
+                        <TechnicianForm
+                            onSubmit={handleRegister}
                             onBack={handleBackToRole}
                             isLoading={isLoading}
                         />

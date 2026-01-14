@@ -29,21 +29,57 @@ const uploadToCloudinary = (buffer) => {
 const registerProvider = async (req, res) => {
     try {
         console.log('Received registration request:', req.body);
+        console.log('Files received:', req.files ? Object.keys(req.files) : 'none');
 
         const {
-            type,
+            type, // 'workshop' or 'individual'
             workshopName, ownerName, crNumber, vatNumber,
             fullName, iqamaId, mobileNumber, password,
             services, offersOutdoorServices,
-            latitude, longitude
+            latitude, longitude, address,
+            logoUrl: bodyLogoUrl,
+            frontPhotoUrl,
         } = req.body;
 
-        let logoUrl = null;
+        // Validate required fields based on type
+        if (!mobileNumber || !password || !type) {
+            return res.status(400).json({
+                success: false,
+                message: 'Type, mobile number and password are required'
+            });
+        }
+
+        let logoUrl = bodyLogoUrl || null;
 
         // Connect to Mongo inside the handler for Serverless consistency
-        await client.connect();
+        console.log('Connecting to MongoDB...');
+        try {
+            await client.connect();
+        } catch (dbError) {
+            console.error('MongoDB connection failed:', dbError);
+            return res.status(503).json({
+                success: false,
+                message: 'Database connection failed. Please try again.'
+            });
+        }
+
         const db = client.db('filter');
-        const collection = db.collection('register_workshop');
+
+        // Define collections
+        const providersCollection = db.collection('register_workshop');
+        const customersCollection = db.collection('customers');
+
+        // Check if phone exists in ANY collection
+        const existingInProviders = await providersCollection.findOne({ mobileNumber });
+        const existingInCustomers = await customersCollection.findOne({ phone: mobileNumber });
+
+        if (existingInProviders || existingInCustomers) {
+            console.log('Registration failed: Phone already registered:', mobileNumber);
+            return res.status(400).json({
+                success: false,
+                message: 'This mobile number is already registered'
+            });
+        }
 
         if (req.files && req.files['logo']) {
             console.log('Uploading logo to Cloudinary...');
@@ -53,15 +89,35 @@ const registerProvider = async (req, res) => {
                 logoUrl = result.secure_url;
             } catch (uploadError) {
                 console.error('Logo upload failed:', uploadError);
-                throw new Error('Logo upload failed: ' + uploadError.message);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Logo upload failed: ' + uploadError.message
+                });
+            }
+        }
+
+        let uploadedFrontPhotoUrl = frontPhotoUrl || null;
+        if (req.files && req.files['frontPhoto']) {
+            console.log('Uploading front photo to Cloudinary...');
+            try {
+                const result = await uploadToCloudinary(req.files['frontPhoto'][0].buffer);
+                console.log('Front photo uploaded:', result.secure_url);
+                uploadedFrontPhotoUrl = result.secure_url;
+            } catch (uploadError) {
+                console.error('Front photo upload failed:', uploadError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Front photo upload failed: ' + uploadError.message
+                });
             }
         }
 
         const providerData = {
-            type,
+            type: type,
             services: services ? JSON.parse(services) : [],
             offersOutdoorServices: offersOutdoorServices === 'true',
-            status: 'pending',
+            mobileNumber,
+            frontPhotoUrl: uploadedFrontPhotoUrl,
             createdAt: new Date()
         };
 
@@ -70,40 +126,38 @@ const registerProvider = async (req, res) => {
             providerData.ownerName = ownerName;
             providerData.crNumber = crNumber;
             providerData.vatNumber = vatNumber;
-            providerData.address = req.body.address;
-            if (latitude && longitude) {
-                providerData.location = {
-                    latitude: parseFloat(latitude),
-                    longitude: parseFloat(longitude)
-                };
-            }
-            providerData.logoUrl = logoUrl;
-        } else if (type === 'individual') {
+        } else {
             providerData.fullName = fullName;
             providerData.iqamaId = iqamaId;
-            providerData.mobileNumber = mobileNumber;
-            providerData.address = req.body.address;
-            if (latitude && longitude) {
-                providerData.location = {
-                    latitude: parseFloat(latitude),
-                    longitude: parseFloat(longitude)
-                };
-            }
-            if (password) {
-                const salt = await bcrypt.genSalt(10);
-                providerData.password = await bcrypt.hash(password, salt);
-            }
+        }
+
+        // Shared location and address
+        if (latitude && longitude) {
+            providerData.location = {
+                type: 'Point',
+                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+            };
+        }
+        if (address) {
+            providerData.address = address;
+        }
+        if (logoUrl) {
             providerData.logoUrl = logoUrl;
         }
 
-        // Insert directly using MongoDB Driver
-        console.log('Inserting into MongoDB...');
-        const result = await collection.insertOne(providerData);
+        // Password hashing
+        const salt = await bcrypt.genSalt(10);
+        providerData.password = await bcrypt.hash(password, salt);
 
-        console.log('Provider saved:', result.insertedId);
+        // Insert into the correctly chosen collection
+        console.log(`Inserting into register_workshop...`);
+        const result = await providersCollection.insertOne(providerData);
+
+        console.log('Provider registered successfully. ID:', result.insertedId);
+
         res.status(201).json({
             success: true,
-            message: 'Registration successful',
+            message: `${type.charAt(0).toUpperCase() + type.slice(1)} registered successfully`,
             providerId: result.insertedId,
             provider: {
                 _id: result.insertedId,
@@ -113,10 +167,44 @@ const registerProvider = async (req, res) => {
 
     } catch (error) {
         console.error('Registration Error:', error);
-        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        res.status(500).json({
+            success: false,
+            message: 'Server Error: ' + error.message,
+            error: error.message
+        });
+    }
+};
+
+const getProviders = async (req, res) => {
+    try {
+        await client.connect();
+        const db = client.db('filter');
+
+        const providers = await db.collection('register_workshop').find({}).sort({ createdAt: -1 }).toArray();
+
+        // Combine and add type-specific naming
+        const mappedProviders = providers.map(p => ({
+            id: p._id,
+            name: p.type === 'workshop' ? p.workshopName : p.fullName,
+            ownerName: p.ownerName,
+            type: p.type, // 'workshop' or 'individual'
+            address: p.address,
+            logoUrl: p.logoUrl,
+            rating: p.rating || 0,
+            createdAt: p.createdAt
+        }));
+
+        res.status(200).json({
+            success: true,
+            providers: mappedProviders
+        });
+    } catch (error) {
+        console.error('Get Providers Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
     }
 };
 
 module.exports = {
-    registerProvider
+    registerProvider,
+    getProviders
 };

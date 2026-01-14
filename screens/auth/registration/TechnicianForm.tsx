@@ -29,6 +29,7 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
         latitude: 0,
         longitude: 0,
         logo: null as string | null,
+        frontPhoto: null as string | null,
         iqamaIdAttach: null as string | null,
         drivingLicenseAttach: null as string | null,
         selectedServices: [] as string[],
@@ -37,7 +38,7 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
 
     const [showPassword, setShowPassword] = useState(false);
 
-    const handlePickImage = async (field: 'logo' | 'iqamaIdAttach' | 'drivingLicenseAttach') => {
+    const handlePickImage = async (field: 'logo' | 'frontPhoto' | 'iqamaIdAttach' | 'drivingLicenseAttach') => {
         const result = await launchImageLibrary({
             mediaType: 'photo',
             quality: 0.8,
@@ -54,11 +55,11 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
     };
 
     return (
-        <ScrollView 
-            style={styles.container} 
+        <ScrollView
+            style={styles.container}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}>
-            
+
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
                 <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
                 <Text style={styles.backText}>{t('registration.change_type')}</Text>
@@ -152,11 +153,11 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
                     <AuthLocationPicker
                         label={t('registration.technician_address_label')}
                         currentAddress={formData.address}
-                        onLocationDetected={(lat, lon, addr) => setFormData({ 
-                            ...formData, 
-                            latitude: lat, 
-                            longitude: lon, 
-                            address: addr 
+                        onLocationDetected={(lat, lon, addr) => setFormData({
+                            ...formData,
+                            latitude: lat,
+                            longitude: lon,
+                            address: addr
                         })}
                     />
                 </View>
@@ -169,6 +170,12 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
                             imageUri={formData.logo}
                             onPickImage={() => handlePickImage('logo')}
                             placeholderIcon="account-circle-outline"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.front_photo')}
+                            imageUri={formData.frontPhoto}
+                            onPickImage={() => handlePickImage('frontPhoto')}
+                            placeholderIcon="camera-outline"
                         />
                         <AuthImagePicker
                             label={t('registration.iqama_id_attach')}
@@ -201,14 +208,14 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
                         <Text style={styles.outdoorTitle}>{t('registration.outdoor_services')}</Text>
                     </View>
                     <View style={styles.toggleRow}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.toggleBtn, formData.offersOutdoorServices && styles.toggleBtnActive]}
                             onPress={() => setFormData({ ...formData, offersOutdoorServices: true })}>
                             <Text style={[styles.toggleBtnText, formData.offersOutdoorServices && styles.toggleBtnTextActive]}>
                                 {t('common.yes')}
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.toggleBtn, !formData.offersOutdoorServices && styles.toggleBtnActive]}
                             onPress={() => setFormData({ ...formData, offersOutdoorServices: false })}>
                             <Text style={[styles.toggleBtnText, !formData.offersOutdoorServices && styles.toggleBtnTextActive]}>
@@ -226,8 +233,8 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
                     </View>
                 </View>
 
-                <TouchableOpacity 
-                    style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+                <TouchableOpacity
+                    style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
                     onPress={handleSubmit}
                     disabled={isLoading}>
                     <Text style={styles.submitButtonText}>{t('registration.submit')}</Text>

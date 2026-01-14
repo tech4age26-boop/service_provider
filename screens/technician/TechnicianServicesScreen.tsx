@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -15,6 +16,8 @@ import { FAB } from '../../components/common/FAB';
 
 import { Service, SheetMode } from '../../types';
 
+const API_BASE_URL = 'https://filter-server.vercel.app';
+
 export function TechnicianServicesScreen() {
   const { theme } = useTheme();
   const { t } = useTranslation();
@@ -24,51 +27,35 @@ export function TechnicianServicesScreen() {
   const [sheetMode, setSheetMode] = useState<SheetMode>('add');
   const [editingItem, setEditingItem] = useState<Partial<Service> | null>(null);
 
-  const [services, setServices] = useState<Service[]>([
-    {
-      id: '1',
-      name: t('services.roadside_assistance'),
-      price: '150',
-      duration: '45',
-      category: 'service',
-      serviceTypes: [t('services.roadside_assistance'), t('services.tire_service')],
-      status: 'active',
-    },
-    {
-      id: '2',
-      name: t('services.oil_change'),
-      price: '80',
-      duration: '30',
-      category: 'service',
-      serviceTypes: [t('services.oil_change')],
-      status: 'active',
-    },
-  ]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [products, setProducts] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [products, setProducts] = useState<Service[]>([
-    {
-      id: '101',
-      name: 'Brake Pads (Toyota)',
-      price: '250',
-      duration: '-',
-      category: 'product',
-      subCategory: 'Brake Pads',
-      stock: '15',
-      sku: 'BP-TY-001',
-      status: 'active',
-    },
-    {
-      id: '102',
-      name: 'Synthetic Oil 5W-30',
-      price: '60',
-      duration: '-',
-      category: 'product',
-      subCategory: 'Fluids',
-      stock: '45',
-      sku: 'OIL-SYN-530',
-      status: 'active',
-    },
-  ]);
+  React.useEffect(() => {
+    fetchItems();
+  }, [activeTab]);
+
+  const fetchItems = async () => {
+    try {
+      setIsLoading(true);
+      const userDataStr = await AsyncStorage.getItem('user_data');
+      if (!userDataStr) return;
+      const userData = JSON.parse(userDataStr);
+      const providerId = userData.id || userData._id;
+
+      const response = await fetch(`${API_BASE_URL}/api/products?providerId=${providerId}`);
+      const result = await response.json();
+
+      if (result.success) {
+        setServices(result.items.filter((i: any) => i.category === 'service'));
+        setProducts(result.items.filter((i: any) => i.category === 'product'));
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOpenAdd = () => {
     console.log('Opening Add Sheet');
@@ -84,34 +71,99 @@ export function TechnicianServicesScreen() {
     setModalVisible(true);
   };
 
-  const handleSave = (data: Partial<Service>) => {
-    if (sheetMode === 'add') {
-      const newItem = { ...data, id: Date.now().toString() } as Service;
+  const handleSave = async (data: Partial<Service>) => {
+    try {
+      const userDataStr = await AsyncStorage.getItem('user_data');
+      if (!userDataStr) return;
+      const userData = JSON.parse(userDataStr);
+      const providerId = userData.id || userData._id;
+
+      const formData = new FormData();
+      formData.append('providerId', providerId);
+      formData.append('name', data.name!);
+      formData.append('price', data.price!);
+      formData.append('category', activeTab === 'services' ? 'service' : 'product');
+      formData.append('status', data.status || 'active');
+
       if (activeTab === 'services') {
-        setServices((prev) => [...prev, newItem]);
+        formData.append('duration', data.duration || '0');
+        formData.append('serviceTypes', JSON.stringify(data.serviceTypes || []));
+        if (data.otherServiceName) formData.append('otherServiceName', data.otherServiceName);
       } else {
-        setProducts((prev) => [...prev, newItem]);
+        formData.append('subCategory', data.subCategory || '');
+        formData.append('stock', data.stock || '0');
+        formData.append('sku', data.sku || '');
+        formData.append('uom', data.uom || '');
       }
-    } else {
-      if (data.category === 'service') {
-        setServices((prev) =>
-          prev.map((item) => (item.id === editingItem?.id ? { ...item, ...data } as Service : item))
-        );
+
+      // Handle images
+      const existingImages: string[] = [];
+      data.images?.forEach((img) => {
+        if (img.startsWith('http')) {
+          existingImages.push(img);
+        } else {
+          formData.append('images', {
+            uri: img,
+            type: 'image/jpeg',
+            name: 'photo.jpg',
+          } as any);
+        }
+      });
+      formData.append('existingImages', JSON.stringify(existingImages));
+
+      const isEditing = sheetMode === 'edit';
+      const url = isEditing
+        ? `${API_BASE_URL}/api/products/${(editingItem as any)?._id || (editingItem as any)?.id}`
+        : `${API_BASE_URL}/api/products`;
+
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        fetchItems();
+        setModalVisible(false);
       } else {
-        setProducts((prev) =>
-          prev.map((item) => (item.id === editingItem?.id ? { ...item, ...data } as Service : item))
-        );
+        Alert.alert('Error', result.message || 'Save failed');
       }
+    } catch (error) {
+      console.error('Save error:', error);
+      Alert.alert('Error', 'Network request failed');
     }
-    setModalVisible(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (activeTab === 'services') {
-      setServices((prev) => prev.filter((item) => item.id !== id));
-    } else {
-      setProducts((prev) => prev.filter((item) => item.id !== id));
-    }
+  const handleDelete = async (id: string) => {
+    Alert.alert(
+      t('common.delete'),
+      t('common.delete_confirm'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/api/products/${id}`, {
+                method: 'DELETE',
+              });
+              const result = await response.json();
+              if (result.success) {
+                fetchItems();
+              }
+            } catch (error) {
+              console.error('Delete error:', error);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -129,7 +181,11 @@ export function TechnicianServicesScreen() {
         />
 
         <View style={styles.content}>
-          {activeTab === 'services' ? (
+          {isLoading ? (
+            <View style={styles.loader}>
+              <ActivityIndicator size="large" color={theme.tint} />
+            </View>
+          ) : activeTab === 'services' ? (
             <ServiceList data={services as any} onEdit={handleEdit} onDelete={handleDelete} />
           ) : (
             <ProductList data={products as any} onEdit={handleEdit} onDelete={handleDelete} />
@@ -157,5 +213,10 @@ export function TechnicianServicesScreen() {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

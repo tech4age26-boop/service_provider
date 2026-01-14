@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Linking,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../../theme/ThemeContext';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +17,8 @@ import AppBody from '../../components/app_body/app-body';
 import TechnicianHeader from '../../components/technician_header/technician-header';
 import { colors } from '../../theme/colors';
 
+const API_BASE_URL = 'https://filter-server.vercel.app';
+
 interface Task {
   id: string;
   service: string;
@@ -22,7 +26,8 @@ interface Task {
   location: string;
   eta?: string;
   scheduled?: string;
-  status: 'active' | 'next' | 'completed';
+  status: 'active' | 'next' | 'completed' | 'pending' | 'in-progress';
+  originalOrder?: any;
 }
 
 interface RouteParams {
@@ -39,7 +44,48 @@ interface TaskDetailProps {
 export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
   const { theme } = useTheme();
   const { t } = useTranslation();
-  const task = route?.params?.task;
+  const [task, setTask] = React.useState<Task>(route?.params?.task);
+  const [updating, setUpdating] = React.useState(false);
+
+  const updateStatus = async (newStatus: string) => {
+    try {
+      setUpdating(true);
+      const orderId = task.originalOrder?._id;
+
+      if (!orderId) {
+        Alert.alert('Error', 'Order ID not found');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/update-order-status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId: orderId,
+          status: newStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setTask({ ...task, status: newStatus as any });
+        Alert.alert('Success', `Status updated to ${newStatus}`);
+        if (newStatus === 'completed') {
+          navigation.goBack();
+        }
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Update Status Error:', error);
+      Alert.alert('Error', 'Network request failed');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   // Safety check for task data
   if (!task) {
@@ -165,17 +211,17 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
         {/* Bill Summary Section */}
         <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('technician.bill_summary')}</Text>
-          
+
           {/* Service Item */}
           <View style={styles.billRow}>
             <Text style={[styles.billItemText, { color: theme.text }]}>{task.service}</Text>
             <Text style={[styles.billItemPrice, { color: theme.text }]}>
               {(() => {
                 const getPrice = (s: string) => {
-                   if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
-                   if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
-                   if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
-                   return 200; // Default
+                  if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
+                  if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
+                  if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
+                  return 200; // Default
                 };
                 const price = getPrice(task.service);
                 return `${price} ${t('wallet.sar')}`;
@@ -187,36 +233,36 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
 
           {/* Calculations */}
           {(() => {
-             const getPrice = (s: string) => {
-                if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
-                if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
-                if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
-                return 200;
-             };
-             const price = getPrice(task.service);
-             const fees = price * 0.10;
-             const net = price - fees;
-             
-             return (
-               <>
-                 <View style={styles.billRow}>
-                   <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.item_total')}</Text>
-                   <Text style={[styles.billValue, { color: theme.text }]}>{price} {t('wallet.sar')}</Text>
-                 </View>
-                 <View style={styles.billRow}>
-                   <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.platform_fees')} (10%)</Text>
-                   <Text style={[styles.billValue, { color: '#FF3B30' }]}>-{fees.toFixed(0)} {t('wallet.sar')}</Text>
-                 </View>
+            const getPrice = (s: string) => {
+              if (s.includes(t('services.oil_change')) || s.includes('Oil')) return 150;
+              if (s.includes(t('services.brake_service')) || s.includes('Brake')) return 320;
+              if (s.includes(t('services.battery_replacement')) || s.includes('Battery')) return 450;
+              return 200;
+            };
+            const price = getPrice(task.service);
+            const fees = price * 0.10;
+            const net = price - fees;
 
-                 <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            return (
+              <>
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.item_total')}</Text>
+                  <Text style={[styles.billValue, { color: theme.text }]}>{price} {t('wallet.sar')}</Text>
+                </View>
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: theme.subText }]}>{t('technician.platform_fees')} (10%)</Text>
+                  <Text style={[styles.billValue, { color: '#FF3B30' }]}>-{fees.toFixed(0)} {t('wallet.sar')}</Text>
+                </View>
 
-                 <View style={styles.billRow}>
-                   <Text style={[styles.billLabelBold, { color: theme.text }]}>{t('technician.net_earnings')}</Text>
-                   <Text style={[styles.billValueBold, { color: '#34C759' }]}>{net.toFixed(0)} {t('wallet.sar')}</Text>
-                 </View>
-                 <Text style={[styles.vatNote, { color: theme.subText }]}>{t('technician.vat_included')}</Text>
-               </>
-             );
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabelBold, { color: theme.text }]}>{t('technician.net_earnings')}</Text>
+                  <Text style={[styles.billValueBold, { color: '#34C759' }]}>{net.toFixed(0)} {t('wallet.sar')}</Text>
+                </View>
+                <Text style={[styles.vatNote, { color: theme.subText }]}>{t('technician.vat_included')}</Text>
+              </>
+            );
           })()}
         </View>
 
@@ -236,19 +282,27 @@ export function TaskDetailScreen({ route, navigation }: TaskDetailProps) {
         <View style={styles.actionContainer}>
           {task.status !== 'completed' ? (
             <>
-              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#2ECC71' }]}>
-                <Text style={styles.actionButtonText}>{t('technician.start_task')}</Text>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#2ECC71' }, updating && { opacity: 0.7 }]}
+                disabled={updating}
+                onPress={() => updateStatus('in-progress')}
+              >
+                {updating ? <ActivityIndicator size="small" color="#000" /> : <Text style={styles.actionButtonText}>{t('technician.start_task')}</Text>}
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionButton, { backgroundColor: '#F4C430' }]}>
-                <Text style={styles.actionButtonText}>{t('technician.mark_completed')}</Text>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#F4C430' }, updating && { opacity: 0.7 }]}
+                disabled={updating}
+                onPress={() => updateStatus('completed')}
+              >
+                {updating ? <ActivityIndicator size="small" color="#000" /> : <Text style={styles.actionButtonText}>{t('technician.mark_completed')}</Text>}
               </TouchableOpacity>
             </>
           ) : (
-            <TouchableOpacity 
-                style={[styles.actionButton, { backgroundColor: colors.primary, marginHorizontal: 0 }]}
-                onPress={() => navigation.navigate('TechnicianFeedback', { task })}
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.primary, marginHorizontal: 0 }]}
+              onPress={() => navigation.navigate('TechnicianFeedback', { task })}
             >
-                <Text style={styles.actionButtonText}>{t('technician.give_feedback')}</Text>
+              <Text style={styles.actionButtonText}>{t('technician.give_feedback')}</Text>
             </TouchableOpacity>
           )}
         </View>

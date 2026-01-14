@@ -16,11 +16,13 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Service {
     id: string;
@@ -116,23 +118,23 @@ const CustomAlert = ({ visible, title, message, buttons, onClose, theme }: any) 
     </Modal>
 );
 
+const API_BASE_URL = 'https://filter-server.vercel.app';
+
 export function ProductsServicesScreen() {
     const { theme } = useTheme();
     const { t } = useTranslation();
 
 
     // --- State ---
-    const [items, setItems] = useState<Service[]>([
-        { id: '1', name: 'Oil Change', price: '50', duration: '30', category: 'service', subCategory: 'Oil Change', status: 'active', serviceTypes: ['Oil Change'] },
-        { id: '2', name: 'Brake Pads', price: '120', duration: '60', category: 'product', subCategory: 'Brake Pads', status: 'active', stock: '15', sku: 'PRD-12345' },
-    ]);
-
+    const [items, setItems] = useState<Service[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Service | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState<'all' | 'services' | 'products'>('all');
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Custom Alert State
     const [alertVisible, setAlertVisible] = useState(false);
@@ -152,6 +154,31 @@ export function ProductsServicesScreen() {
     };
 
     const [newItem, setNewItem] = useState<Partial<Service>>(initialFormState);
+
+    React.useEffect(() => {
+        fetchItems();
+    }, []);
+
+    const fetchItems = async () => {
+        try {
+            setIsLoading(true);
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            if (!userDataStr) return;
+            const userData = JSON.parse(userDataStr);
+            const providerId = userData.id;
+
+            const response = await fetch(`${API_BASE_URL}/api/products?providerId=${providerId}`);
+            const result = await response.json();
+
+            if (result.success) {
+                setItems(result.items);
+            }
+        } catch (error) {
+            console.error('Fetch Items Error:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const filteredItems = items.filter(item => {
         if (activeTab === 'all') return true;
@@ -253,31 +280,74 @@ export function ProductsServicesScreen() {
         return true;
     };
 
-    const handleSaveItem = () => {
+    const handleSaveItem = async () => {
         if (!validateForm()) return;
 
-        if (isEditing) {
-            setItems(items.map(item => item.id === newItem.id ? { ...item, ...newItem } as Service : item));
-        } else {
-            const item: Service = {
-                id: Date.now().toString(),
-                name: newItem.name!,
-                price: newItem.price!,
-                duration: newItem.duration || '-',
-                category: newItem.category || 'service',
-                subCategory: newItem.subCategory,
-                images: newItem.images,
-                stock: newItem.stock,
-                sku: newItem.sku,
-                status: newItem.status,
-                serviceTypes: newItem.serviceTypes
-            };
-            setItems([...items, item]);
-        }
+        try {
+            setIsSaving(true);
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            if (!userDataStr) return;
+            const userData = JSON.parse(userDataStr);
+            const providerId = userData.id;
 
-        setShowAddModal(false);
-        setNewItem(initialFormState);
-        setIsEditing(false);
+            const formData = new FormData();
+            formData.append('providerId', providerId);
+            formData.append('name', newItem.name!);
+            formData.append('price', newItem.price!);
+            formData.append('category', newItem.category!);
+            formData.append('status', newItem.status!);
+
+            if (newItem.category === 'product') {
+                formData.append('subCategory', newItem.subCategory!);
+                formData.append('stock', newItem.stock!);
+                formData.append('sku', newItem.sku!);
+            } else {
+                formData.append('duration', newItem.duration!);
+                formData.append('serviceTypes', JSON.stringify(newItem.serviceTypes));
+            }
+
+            // Existing images vs new images logic
+            const existingImages: string[] = [];
+            newItem.images?.forEach((img) => {
+                if (img.startsWith('http')) {
+                    existingImages.push(img);
+                } else {
+                    formData.append('images', {
+                        uri: img,
+                        type: 'image/jpeg',
+                        name: 'item.jpg',
+                    } as any);
+                }
+            });
+            formData.append('existingImages', JSON.stringify(existingImages));
+
+            const url = isEditing
+                ? `${API_BASE_URL}/api/products/${(newItem as any)._id || newItem.id}`
+                : `${API_BASE_URL}/api/products`;
+
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                body: formData,
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert('Success', `Item ${isEditing ? 'updated' : 'added'} successfully`, [{ text: 'OK', onPress: () => { closeAlert(); fetchItems(); setShowAddModal(false); } }]);
+            } else {
+                showAlert('Error', result.message || 'Operation failed', [{ text: 'OK', onPress: closeAlert }]);
+            }
+        } catch (error) {
+            console.error('Save Item Error:', error);
+            showAlert('Error', 'Network request failed', [{ text: 'OK', onPress: closeAlert }]);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleEditStart = (item: Service) => {
@@ -296,9 +366,22 @@ export function ProductsServicesScreen() {
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {
-                        setItems(items.filter(i => i.id !== id));
-                        closeAlert();
+                    onPress: async () => {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/api/products/${id}`, {
+                                method: 'DELETE',
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                fetchItems();
+                                closeAlert();
+                            } else {
+                                showAlert('Error', result.message || 'Delete failed', [{ text: 'OK', onPress: closeAlert }]);
+                            }
+                        } catch (error) {
+                            console.error('Delete Error:', error);
+                            showAlert('Error', 'Network request failed', [{ text: 'OK', onPress: closeAlert }]);
+                        }
                     }
                 }
             ]);
@@ -359,48 +442,59 @@ export function ProductsServicesScreen() {
 
             {/* List */}
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {filteredItems.map((item) => (
-                    <TouchableOpacity
-                        key={item.id}
-                        style={[styles.itemCard, { backgroundColor: theme.cardBackground, opacity: item.status === 'inactive' ? 0.6 : 1 }]}
-                        onPress={() => openDetailModal(item)}
-                        activeOpacity={0.7}
-                    >
-                        <View style={styles.itemHeader}>
-                            <View style={styles.itemInfo}>
-                                <MaterialCommunityIcons
-                                    name={item.category === 'service' ? 'wrench' : 'package-variant'}
-                                    size={24}
-                                    color="#F4C430"
-                                />
-                                <View style={styles.itemDetails}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                        <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
-                                        {item.status === 'inactive' && <Text style={{ fontSize: 10, color: '#FF3B30', fontWeight: 'bold' }}>INACTIVE</Text>}
+                {isLoading ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
+                        <ActivityIndicator size="large" color="#F4C430" />
+                    </View>
+                ) : filteredItems.length === 0 ? (
+                    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
+                        <MaterialCommunityIcons name="package-variant" size={60} color={theme.subText} />
+                        <Text style={{ color: theme.subText, fontSize: 16, marginTop: 10 }}>No items found</Text>
+                    </View>
+                ) : (
+                    filteredItems.map((item) => (
+                        <TouchableOpacity
+                            key={(item as any)._id || item.id}
+                            style={[styles.itemCard, { backgroundColor: theme.cardBackground, opacity: item.status === 'inactive' ? 0.6 : 1 }]}
+                            onPress={() => openDetailModal(item)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={styles.itemHeader}>
+                                <View style={styles.itemInfo}>
+                                    <MaterialCommunityIcons
+                                        name={item.category === 'service' ? 'wrench' : 'package-variant'}
+                                        size={24}
+                                        color="#F4C430"
+                                    />
+                                    <View style={styles.itemDetails}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+                                            {item.status === 'inactive' && <Text style={{ fontSize: 10, color: '#FF3B30', fontWeight: 'bold' }}>INACTIVE</Text>}
+                                        </View>
+                                        <Text style={styles.itemDuration}>
+                                            {item.category === 'service'
+                                                ? `${item.serviceTypes?.slice(0, 2).join(', ') || item.subCategory}`
+                                                : item.subCategory
+                                            } • {item.category === 'service' ? `${item.duration} min` : `Stock: ${item.stock || '-'}`}
+                                            {item.category === 'service' && (item.serviceTypes?.length || 0) > 2 && ` +${(item.serviceTypes?.length || 0) - 2}`}
+                                        </Text>
                                     </View>
-                                    <Text style={styles.itemDuration}>
-                                        {item.category === 'service'
-                                            ? `${item.serviceTypes?.slice(0, 2).join(', ') || item.subCategory}`
-                                            : item.subCategory
-                                        } • {item.category === 'service' ? `${item.duration} min` : `Stock: ${item.stock || '-'}`}
-                                        {item.category === 'service' && (item.serviceTypes?.length || 0) > 2 && ` +${(item.serviceTypes?.length || 0) - 2}`}
-                                    </Text>
                                 </View>
+                                <Text style={styles.itemPrice}>{item.price} SAR</Text>
                             </View>
-                            <Text style={styles.itemPrice}>{item.price} SAR</Text>
-                        </View>
-                        <View style={[styles.itemActions, { borderTopColor: theme.border }]}>
-                            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.background }]} onPress={() => handleEditStart(item)}>
-                                <MaterialCommunityIcons name="pencil" size={18} color="#007AFF" />
-                                <Text style={styles.actionBtnText}>Edit</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn, { backgroundColor: theme.background }]} onPress={() => handleDelete(item.id)}>
-                                <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
-                                <Text style={[styles.actionBtnText, styles.deleteBtnText]}>Delete</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </TouchableOpacity>
-                ))}
+                            <View style={[styles.itemActions, { borderTopColor: theme.border }]}>
+                                <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.background }]} onPress={() => handleEditStart(item)}>
+                                    <MaterialCommunityIcons name="pencil" size={18} color="#007AFF" />
+                                    <Text style={styles.actionBtnText}>Edit</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn, { backgroundColor: theme.background }]} onPress={() => handleDelete((item as any)._id || item.id)}>
+                                    <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
+                                    <Text style={[styles.actionBtnText, styles.deleteBtnText]}>Delete</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    ))
+                )}
                 <View style={{ height: 100 }} />
             </ScrollView>
 
@@ -542,8 +636,16 @@ export function ProductsServicesScreen() {
                                 </>
                             )}
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveItem}>
-                                <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Add Item'}</Text>
+                            <TouchableOpacity
+                                style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
+                                onPress={handleSaveItem}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <ActivityIndicator size="small" color="#1C1C1E" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Add Item'}</Text>
+                                )}
                             </TouchableOpacity>
                         </ScrollView>
                     </View>

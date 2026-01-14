@@ -29,6 +29,7 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
         latitude: 0,
         longitude: 0,
         logo: null as string | null,
+        frontPhoto: null as string | null,
         vatCertificate: null as string | null,
         crDocument: null as string | null,
         selectedServices: [] as string[],
@@ -37,7 +38,7 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
 
     const [showPassword, setShowPassword] = useState(false);
 
-    const handlePickImage = async (field: 'logo' | 'vatCertificate' | 'crDocument') => {
+    const handlePickImage = async (field: 'logo' | 'frontPhoto' | 'vatCertificate' | 'crDocument') => {
         const result = await launchImageLibrary({
             mediaType: 'photo',
             quality: 0.8,
@@ -54,11 +55,11 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
     };
 
     return (
-        <ScrollView 
-            style={styles.container} 
+        <ScrollView
+            style={styles.container}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}>
-            
+
             <TouchableOpacity style={styles.backButton} onPress={onBack}>
                 <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text} />
                 <Text style={styles.backText}>{t('registration.change_type')}</Text>
@@ -154,11 +155,11 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
                     <AuthLocationPicker
                         label={t('registration.address_label')}
                         currentAddress={formData.address}
-                        onLocationDetected={(lat, lon, addr) => setFormData({ 
-                            ...formData, 
-                            latitude: lat, 
-                            longitude: lon, 
-                            address: addr 
+                        onLocationDetected={(lat, lon, addr) => setFormData({
+                            ...formData,
+                            latitude: lat,
+                            longitude: lon,
+                            address: addr
                         })}
                     />
                 </View>
@@ -171,6 +172,12 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
                             imageUri={formData.logo}
                             onPickImage={() => handlePickImage('logo')}
                             placeholderIcon="store-search"
+                        />
+                        <AuthImagePicker
+                            label={t('registration.front_photo')}
+                            imageUri={formData.frontPhoto}
+                            onPickImage={() => handlePickImage('frontPhoto')}
+                            placeholderIcon="camera-outline"
                         />
                         <AuthImagePicker
                             label={t('registration.vat_certificate_attach')}
@@ -203,14 +210,14 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
                         <Text style={styles.outdoorTitle}>{t('registration.outdoor_services')}</Text>
                     </View>
                     <View style={styles.toggleRow}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.toggleBtn, formData.offersOutdoorServices && styles.toggleBtnActive]}
                             onPress={() => setFormData({ ...formData, offersOutdoorServices: true })}>
                             <Text style={[styles.toggleBtnText, formData.offersOutdoorServices && styles.toggleBtnTextActive]}>
                                 {t('common.yes')}
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={[styles.toggleBtn, !formData.offersOutdoorServices && styles.toggleBtnActive]}
                             onPress={() => setFormData({ ...formData, offersOutdoorServices: false })}>
                             <Text style={[styles.toggleBtnText, !formData.offersOutdoorServices && styles.toggleBtnTextActive]}>
@@ -228,8 +235,8 @@ export const WorkshopForm = ({ onSubmit, onBack, isLoading }: WorkshopFormProps)
                     </View>
                 </View>
 
-                <TouchableOpacity 
-                    style={[styles.submitButton, isLoading && styles.submitButtonDisabled]} 
+                <TouchableOpacity
+                    style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
                     onPress={handleSubmit}
                     disabled={isLoading}>
                     <Text style={styles.submitButtonText}>{t('registration.submit')}</Text>
