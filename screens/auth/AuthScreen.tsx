@@ -62,10 +62,11 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
             if (result.success) {
                 await AsyncStorage.setItem('user_data', JSON.stringify(result.user));
-                onLogin();
+                // onLogin();
             } else {
                 Alert.alert('Login Failed', result.message || 'Invalid credentials');
             }
+            onLogin()
         } catch (error) {
             console.error('Login Error:', error);
             Alert.alert('Error', 'Network or server error. Please try again.');

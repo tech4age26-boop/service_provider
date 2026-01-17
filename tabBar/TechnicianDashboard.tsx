@@ -9,7 +9,7 @@ import { TechnicianNavigation } from '../navigation/technician/technician-naviga
 import { TechnicianOrderNavigation } from '../navigation/technician/technician-order.navigation';
 import { TechnicianServicesScreen } from '../screens/technician/TechnicianServicesScreen';
 import { TechnicianSettingsStack } from '../navigation/technician/TechnicianSettingsStack';
-import { useTheme } from '../App'
+import { useTheme } from '../App';
 
 const Tab = createBottomTabNavigator();
 

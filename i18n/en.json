@@ -31,7 +31,12 @@
         "filter_technician": "Filter Technician",
         "scheduled": "Scheduled",
         "description": "Description",
-        "description_placeholder": "Enter description here..."
+        "description_placeholder": "Enter description here...",
+        "accept": "Accept",
+        "decline": "Decline",
+        "from": "From",
+        "to": "To",
+        "quick_actions": "Quick Actions"
     },
     "auth": {
         "login_title": "Login to your account",
@@ -113,7 +118,9 @@
         "wallet_balance": "Wallet Balance",
         "active_jobs": "Active Jobs",
         "completion_rate": "Completion Rate",
-        "shop_name": "Filter Technician"
+        "shop_name": "Filter Technician",
+        "total_orders": "Total Orders",
+        "total_earnings": "Total Earnings"
     },
     "status": {
         "pending": "Pending",
@@ -237,7 +244,10 @@
         "title": "Orders",
         "active": "Active",
         "completed": "Completed",
-        "view_details": "View Details"
+        "view_details": "View Details",
+        "incoming": "Incoming Orders",
+        "pending": "Pending",
+        "view_all": "View All Orders"
     },
     "technician": {
         "jobs_title": "My Jobs",
@@ -362,5 +372,13 @@
         "a4": "If you are unable to attend, please cancel the job as early as possible so it can be reassigned. Repeated cancellations may affect your rating.",
         "q5": "How do I update my bank details?",
         "a5": "Go to Settings > Wallet > Payout Methods to add or update your bank information securely."
+    },
+    "reports": {
+        "title": "Reports",
+        "select_date_range": "Select Date Range",
+        "earnings_summary": "Earnings Summary",
+        "total_earnings": "Total Earnings",
+        "order_details": "Order Details",
+        "no_orders": "No orders found for selected date range"
     }
 }
