@@ -52,7 +52,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    phone: `+966${phone}`,
+                    phone: phone.trim(),
                     password: password,
                     role: selectedRole
                 }),
@@ -62,7 +62,15 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
 
             if (result.success) {
                 await AsyncStorage.setItem('user_data', JSON.stringify(result.user));
-                // onLogin();
+
+                // Show specific alert for employees as requested
+                if (selectedRole === 'technician' || selectedRole === 'cashier') {
+                    Alert.alert('Success', `${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)} found in database`, [
+                        { text: 'OK', onPress: () => onLogin() }
+                    ]);
+                } else {
+                    onLogin();
+                }
             } else {
                 Alert.alert('Login Failed', result.message || 'Invalid credentials');
             }

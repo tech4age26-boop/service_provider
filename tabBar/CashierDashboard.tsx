@@ -1,14 +1,15 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StyleSheet } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
-import { TechnicianNavigation } from '../navigation/technician/technician-navigation';
-import { TechnicianOrderNavigation } from '../navigation/technician/technician-order.navigation';
-import { TechnicianSettingsStack } from '../navigation/technician/TechnicianSettingsStack';
-import { useTheme } from '../App'
+import { useTheme } from '../theme/ThemeContext';
+
+import { CashierNavigation } from '../navigation/cashier/CashierNavigation';
+import { CashierSettingsScreen } from '../screens/cashier/CashierSettingsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -47,59 +48,27 @@ function Tabs({ onLogout }: CashierDashboardProps) {
         >
             <Tab.Screen
                 name="Home"
-                component={TechnicianNavigation}
+                component={CashierNavigation}
                 options={{
-                    tabBarLabel: t('common.dashboard'),
+                    tabBarLabel: 'POS',
                     tabBarIcon: ({ color, size }) => (
-                        <MaterialCommunityIcons name="home" size={size} color={color} />
+                        <MaterialCommunityIcons name="view-grid" size={size} color={color} />
                     ),
                 }}
             />
 
-            <Tab.Screen
-                name="Orders"
-                component={TechnicianOrderNavigation}
-                options={{
-                    tabBarLabel: t('orders.title'),
-                    tabBarIcon: ({ color, size }) => (
-                        <MaterialCommunityIcons
-                            name="clipboard-list"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
 
-            <Tab.Screen
-                name="Transactions"
-                component={TechnicianNavigation}
-                options={{
-                    tabBarLabel: t('wallet.transactions'),
-                    tabBarIcon: ({ color, size }) => (
-                        <MaterialCommunityIcons
-                            name="cash-multiple"
-                            size={size}
-                            color={color}
-                        />
-                    ),
-                }}
-            />
 
             <Tab.Screen
                 name="Settings"
                 options={{
-                    tabBarLabel: t('settings.settings_title'),
+                    tabBarLabel: t('settings.settings_title') || 'Settings',
                     tabBarIcon: ({ color, size }) => (
-                        <MaterialCommunityIcons
-                            name="account-cog"
-                            size={size}
-                            color={color}
-                        />
+                        <MaterialCommunityIcons name="cog" size={size} color={color} />
                     ),
                 }}
             >
-                {(props) => <TechnicianSettingsStack {...props} onLogout={onLogout} />}
+                {(props) => <CashierSettingsScreen {...props} onLogout={onLogout} />}
             </Tab.Screen>
         </Tab.Navigator>
     );
@@ -108,7 +77,7 @@ function Tabs({ onLogout }: CashierDashboardProps) {
 export function CashierDashboard({ onLogout }: CashierDashboardProps) {
     return (
         <SafeAreaProvider>
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={styles.container}>
                 <NavigationContainer>
                     <Tabs onLogout={onLogout} />
                 </NavigationContainer>
@@ -116,3 +85,9 @@ export function CashierDashboard({ onLogout }: CashierDashboardProps) {
         </SafeAreaProvider>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+});

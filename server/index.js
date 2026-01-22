@@ -7,8 +7,10 @@ const customerController = require('./controllers/CustomerController');
 const loginController = require('./controllers/LoginController');
 const productServiceController = require('./controllers/ProductServiceController');
 const workshopController = require('./controllers/WorkshopController');
-const employeeController = require('./controllers/EmployeeController');
 const orderController = require('./controllers/OrderController');
+const employeeController = require('./controllers/EmployeeController');
+const supplierController = require('./controllers/SupplierController');
+const inventoryController = require('./controllers/InventoryController');
 
 const app = express();
 app.use(cors());
@@ -29,15 +31,12 @@ const uploadRegistration = multer({ storage: storage }).fields([
 const uploadProductImages = multer({ storage: storage }).array('images', 4);
 
 app.post('/api/register', uploadRegistration, registrationController.registerProvider);
-app.get('/api/providers', registrationController.getProviders); // Add this
+app.get('/api/providers', registrationController.getProviders);
 app.post('/api/register-customer', customerController.registerCustomer);
-app.get('/api/customer/:id', customerController.getCustomerById);
 app.post('/api/login', loginController.login);
-app.post('/api/forgot-password', loginController.forgotPassword);
-app.post('/api/verify-otp', loginController.verifyOtp);
 app.get('/api/workshops', workshopController.getWorkshops);
-app.post('/api/add-employee', employeeController.addEmployee);
-app.get('/api/employees', employeeController.getEmployees);
+
+// Order Routes
 app.post('/api/orders', orderController.createOrder);
 app.get('/api/orders', orderController.getCustomerOrders);
 app.get('/api/provider-orders', orderController.getProviderOrders);
@@ -48,6 +47,27 @@ app.post('/api/products', uploadProductImages, productServiceController.createIt
 app.get('/api/products', productServiceController.getItems);
 app.put('/api/products/:id', uploadProductImages, productServiceController.updateItem);
 app.delete('/api/products/:id', productServiceController.deleteItem);
+
+// Employee Routes
+app.post('/api/employees', employeeController.addEmployee);
+app.get('/api/employees', employeeController.getEmployees);
+app.put('/api/employees/:employeeId', employeeController.updateEmployee);
+app.delete('/api/employees/:employeeId', employeeController.deleteEmployee);
+
+// Supplier Routes
+app.post('/api/suppliers', supplierController.addSupplier);
+app.get('/api/suppliers', supplierController.getSuppliers);
+app.put('/api/suppliers/:id', supplierController.updateSupplier);
+app.delete('/api/suppliers/:id', supplierController.deleteSupplier);
+
+// Inventory Routes
+app.post('/api/inventory', inventoryController.addInventory);
+app.get('/api/inventory', inventoryController.getInventory);
+app.put('/api/inventory/:id', inventoryController.updateInventory);
+app.delete('/api/inventory/:id', inventoryController.deleteInventory);
+app.post('/api/inventory-categories', inventoryController.addCategory);
+app.get('/api/inventory-categories', inventoryController.getCategories);
+app.delete('/api/inventory-categories/:id', inventoryController.deleteCategory);
 
 // Health check
 app.get('/', (req, res) => res.send('Filter API is running'));

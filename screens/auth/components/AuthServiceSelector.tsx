@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, FlatList } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
 import { colors } from '../../../theme/colors';
@@ -14,6 +14,10 @@ const SERVICES = [
     { id: '6', key: 'ac_repair', icon: 'snowflake' },
 ];
 
+// Split services into rows of 3
+const ROW_1 = SERVICES.slice(0, 3);
+const ROW_2 = SERVICES.slice(3, 6);
+
 interface AuthServiceSelectorProps {
     selectedServices: string[];
     onToggleService: (id: string) => void;
@@ -22,44 +26,42 @@ interface AuthServiceSelectorProps {
 export const AuthServiceSelector = ({ selectedServices, onToggleService }: AuthServiceSelectorProps) => {
     const { t } = useTranslation();
 
+    const renderServiceItem = (item: typeof SERVICES[0], isSelected: boolean) => (
+        <TouchableOpacity
+            key={item.id}
+            style={[styles.serviceItem, isSelected && styles.serviceItemSelected]}
+            onPress={() => onToggleService(item.id)}
+            activeOpacity={0.7}>
+            <View style={[styles.iconContainer, isSelected && styles.iconContainerSelected]}>
+                <MaterialCommunityIcons
+                    name={item.icon as any}
+                    size={20}
+                    color={isSelected ? colors.white : colors.primary}
+                />
+            </View>
+            <Text
+                style={[styles.serviceText, isSelected && styles.serviceTextSelected]}
+                numberOfLines={2}>
+                {t(`services.${item.key}`)}
+            </Text>
+            {isSelected && (
+                <View style={styles.checkBadge}>
+                    <MaterialCommunityIcons name="check-bold" size={8} color={colors.white} />
+                </View>
+            )}
+        </TouchableOpacity>
+    );
+
     return (
         <View style={styles.container}>
             <Text style={styles.title}>{t('registration.select_services')}</Text>
             <Text style={styles.subtitle}>{t('registration.services_subtitle')}</Text>
-            
-            <View style={styles.grid}>
-                {SERVICES.map((item) => {
-                    const isSelected = selectedServices.includes(item.id);
-                    return (
-                        <TouchableOpacity
-                            key={item.id}
-                            style={[
-                                styles.serviceItem,
-                                isSelected && styles.serviceItemSelected
-                            ]}
-                            onPress={() => onToggleService(item.id)}
-                            activeOpacity={0.7}>
-                            <View style={[styles.iconContainer, isSelected && styles.iconContainerSelected]}>
-                                <MaterialCommunityIcons
-                                    name={item.icon as any}
-                                    size={28}
-                                    color={isSelected ? colors.white : colors.primary}
-                                />
-                            </View>
-                            <Text style={[
-                                styles.serviceText,
-                                isSelected && styles.serviceTextSelected
-                            ]}>
-                                {t(`services.${item.key}`)}
-                            </Text>
-                            {isSelected && (
-                                <View style={styles.checkBadge}>
-                                    <MaterialCommunityIcons name="check-bold" size={12} color={colors.white} />
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    );
-                })}
+
+            <View style={styles.row}>
+                {ROW_1.map((item) => renderServiceItem(item, selectedServices.includes(item.id)))}
+            </View>
+            <View style={styles.row}>
+                {ROW_2.map((item) => renderServiceItem(item, selectedServices.includes(item.id)))}
             </View>
         </View>
     );
@@ -81,72 +83,65 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 13,
         color: colors.subText,
-        marginBottom: 20,
+        marginBottom: 16,
         fontFamily: typography.fontFamily,
     },
-    grid: {
+    row: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        marginHorizontal: -8,
+        justifyContent: 'space-between',
+        marginBottom: 10,
     },
     serviceItem: {
-        width: '45.5%',
+        flex: 1,
+        marginHorizontal: 4,
         backgroundColor: colors.white,
-        borderRadius: 20,
-        padding: 20,
-        margin: 8,
+        borderRadius: 14,
+        paddingVertical: 14,
+        paddingHorizontal: 6,
         borderWidth: 1.5,
         borderColor: colors.border,
         alignItems: 'center',
         position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.03,
-        shadowRadius: 15,
-        elevation: 2,
     },
     serviceItemSelected: {
         borderColor: colors.primary,
-        backgroundColor: colors.white,
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 6,
+        backgroundColor: '#FFFEF5',
     },
     iconContainer: {
-        width: 56,
-        height: 56,
-        borderRadius: 16,
+        width: 38,
+        height: 38,
+        borderRadius: 10,
         backgroundColor: colors.inputBackground,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
+        marginBottom: 6,
     },
     iconContainerSelected: {
         backgroundColor: colors.primary,
     },
     serviceText: {
-        fontSize: 13,
+        fontSize: 10,
         color: colors.text,
         fontWeight: '600',
         textAlign: 'center',
         fontFamily: typography.fontFamily,
-        lineHeight: 18,
+        lineHeight: 13,
     },
     serviceTextSelected: {
         color: colors.text,
-        fontWeight: '800',
+        fontWeight: '700',
     },
     checkBadge: {
         position: 'absolute',
-        top: 10,
-        right: 10,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
+        top: 4,
+        right: 4,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
         backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
+        borderWidth: 1.5,
         borderColor: colors.white,
     },
 });

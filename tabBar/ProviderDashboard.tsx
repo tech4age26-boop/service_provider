@@ -8,10 +8,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
 import { ProviderHomeScreen } from '../screens/Provider/ProviderHomeScreen';
-import { ProviderEmployeesScreen } from '../screens/Provider/ProviderEmployeesScreen';
 import { ProviderOrdersScreen } from '../screens/Provider/ProviderOrdersScreen';
 import { ProductsServicesScreen } from '../screens/Provider/ProductsServicesScreen';
-import { SettingsStackNavigator } from '../navigation/technician/SettingsStackNavigator';
+import { ProviderSettingsStackNavigator } from '../navigation/ProviderSettingsStackNavigator';
 
 import { useTheme } from '../theme/ThemeContext';
 
@@ -53,29 +52,9 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                     name="Home"
                     component={ProviderHomeScreen}
                     options={{
-                        tabBarLabel: t('common.welcome'),
+                        tabBarLabel: 'Home',
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="home" size={size} color={color} />
-                        ),
-                    }}
-                />
-                <Tab.Screen
-                    name="Products"
-                    component={ProductsServicesScreen}
-                    options={{
-                        tabBarLabel: t('products.title'),
-                        tabBarIcon: ({ color, size }) => (
-                            <MaterialCommunityIcons name="package-variant" size={size} color={color} />
-                        ),
-                    }}
-                />
-                <Tab.Screen
-                    name="Employees"
-                    component={ProviderEmployeesScreen}
-                    options={{
-                        tabBarLabel: t('employees.title'),
-                        tabBarIcon: ({ color, size }) => (
-                            <MaterialCommunityIcons name="account-group" size={size} color={color} />
                         ),
                     }}
                 />
@@ -90,7 +69,7 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                     }}
                 />
                 <Tab.Screen
-                    name="Settings"
+                    name="SettingsTab"
                     options={{
                         tabBarLabel: t('settings.settings_title'),
                         tabBarIcon: ({ color, size }) => (
@@ -98,7 +77,7 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                         ),
                     }}
                 >
-                    {(props) => <SettingsStackNavigator {...props} onLogout={onLogout} />}
+                    {(props) => <ProviderSettingsStackNavigator {...props} onLogout={onLogout} />}
                 </Tab.Screen>
             </Tab.Navigator>
         </NavigationContainer>

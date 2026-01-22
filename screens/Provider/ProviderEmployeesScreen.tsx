@@ -2,7 +2,7 @@
  * Provider Dashboard - Employees Screen
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -16,23 +16,32 @@ import {
     KeyboardAvoidingView,
     Platform,
     Dimensions,
+    ActivityIndicator,
+    Alert,
+    Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface Employee {
-
-    id: string;
+    _id: string; // From MongoDB
+    id?: string; // Legacy/UI
     name: string;
-    role: string;
+    number: string;
+    employeeType: string;
+    password?: string;
     salary: string;
+    commission: string;
     status: 'active' | 'inactive';
     avatar?: string;
 }
 
-const EMPLOYEE_ROLES = ['Cashier', 'Technician', 'Senior Technician', 'Assistant', 'Electrician'];
+const API_BASE_URL = 'https://filter-server.vercel.app';
+
+const EMPLOYEE_ROLES = ['Technician', 'Cashier'];
 const { width } = Dimensions.get('window');
 
 // --- Reusable Components ---
@@ -117,12 +126,9 @@ export function ProviderEmployeesScreen() {
 
 
     // --- State ---
-    const [employees, setEmployees] = useState<Employee[]>([
-        { id: '1', name: 'Ahmed Ali', role: 'Senior Mechanic', salary: '5000', status: 'active', avatar: undefined }, // Using undefined for default icon logic if we don't have local assets
-        { id: '2', name: 'Mohammed Hassan', role: 'Technician', salary: '4000', status: 'active', avatar: undefined },
-        { id: '3', name: 'Khalid Omar', role: 'Assistant', salary: '3000', status: 'active', avatar: undefined },
-        { id: '4', name: 'Youssef Ibrahim', role: 'Electrician', salary: '4500', status: 'inactive', avatar: undefined },
-    ]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [workshopId, setWorkshopId] = useState<string | null>(null);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -137,13 +143,46 @@ export function ProviderEmployeesScreen() {
 
     const initialFormState: Partial<Employee> = {
         name: '',
-        role: '',
-        salary: '',
+        number: '',
+        employeeType: '',
+        password: '',
+        salary: '0',
+        commission: '0',
         status: 'active',
         avatar: undefined,
     };
 
     const [newEmployee, setNewEmployee] = useState<Partial<Employee>>(initialFormState);
+
+    // --- API Interactions ---
+
+    useEffect(() => {
+        loadEmployees();
+    }, []);
+
+    const loadEmployees = async () => {
+        try {
+            const userData = await AsyncStorage.getItem('user_data');
+            if (userData) {
+                const user = JSON.parse(userData);
+                const wId = user.id || user._id;
+                setWorkshopId(wId);
+
+                const response = await fetch(`${API_BASE_URL}/api/employees?workshopId=${wId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    setEmployees(result.data);
+                } else {
+                    console.error('Failed to fetch employees:', result.message);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading employees:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // --- Actions ---
 
@@ -173,13 +212,22 @@ export function ProviderEmployeesScreen() {
         const invalidFields: string[] = [];
 
         if (!newEmployee.name) missingFields.push('Name');
-        if (!newEmployee.role) missingFields.push('Employee Type');
+        if (!newEmployee.number) missingFields.push('Phone Number');
+        if (!newEmployee.employeeType) missingFields.push('Employee Type');
+        if (!isEditing && !newEmployee.password) missingFields.push('Password');
 
         // Salary Validation
-        if (!newEmployee.salary) {
+        if (newEmployee.salary === undefined || newEmployee.salary === '') {
             missingFields.push('Salary');
         } else if (isNaN(Number(newEmployee.salary)) || Number(newEmployee.salary) < 0) {
             invalidFields.push('Salary must be a valid number');
+        }
+
+        // Commission Validation
+        if (newEmployee.commission !== undefined && newEmployee.commission !== '') {
+            if (isNaN(Number(newEmployee.commission)) || Number(newEmployee.commission) < 0 || Number(newEmployee.commission) > 100) {
+                invalidFields.push('Commission must be between 0 and 100');
+            }
         }
 
         if (missingFields.length > 0) {
@@ -195,26 +243,44 @@ export function ProviderEmployeesScreen() {
         return true;
     };
 
-    const handleSaveEmployee = () => {
+    const handleSaveEmployee = async () => {
         if (!validateForm()) return;
 
-        if (isEditing) {
-            setEmployees(employees.map(emp => emp.id === newEmployee.id ? { ...emp, ...newEmployee } as Employee : emp));
-        } else {
-            const employee: Employee = {
-                id: Date.now().toString(),
-                name: newEmployee.name!,
-                role: newEmployee.role!,
-                salary: newEmployee.salary!,
-                status: newEmployee.status || 'active',
-                avatar: newEmployee.avatar,
-            };
-            setEmployees([...employees, employee]);
-        }
+        setIsLoading(true);
+        try {
+            const endpoint = isEditing ? `${API_BASE_URL}/api/employees/${newEmployee._id}` : `${API_BASE_URL}/api/employees`;
+            const method = isEditing ? 'PUT' : 'POST';
 
-        setShowAddModal(false);
-        setNewEmployee(initialFormState);
-        setIsEditing(false);
+            const payload = {
+                ...newEmployee,
+                workshopId: workshopId,
+                salary: newEmployee.salary?.toString(),
+                commission: newEmployee.commission?.toString(),
+            };
+
+            const response = await fetch(endpoint, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                setShowAddModal(false);
+                setNewEmployee(initialFormState);
+                setIsEditing(false);
+                loadEmployees(); // Refresh list
+                Alert.alert('Success', isEditing ? 'Employee updated' : 'Employee added');
+            } else {
+                Alert.alert('Error', result.message || 'Action failed');
+            }
+        } catch (error) {
+            console.error('Save employee error:', error);
+            Alert.alert('Error', 'Network request failed');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleEditStart = (employee: Employee) => {
@@ -224,19 +290,30 @@ export function ProviderEmployeesScreen() {
     };
 
     const handleDelete = (id: string, fromDetail: boolean = false) => {
-        // Close detail modal first if open to avoid overlay issues, usually not needed with state but safer visually
         if (fromDetail) setShowDetailModal(false);
-        closeAlert(); // Close menu alert if open
+        closeAlert();
 
         setTimeout(() => {
             showAlert('Delete Employee', 'Are you sure you want to delete this employee?', [
-                { text: 'Cancel', style: 'cancel', onPress: () => { if (fromDetail) setShowDetailModal(true); closeAlert(); } }, // Re-open detail if cancelled from detail? Optional.
+                { text: 'Cancel', style: 'cancel', onPress: () => { if (fromDetail) setShowDetailModal(true); closeAlert(); } },
                 {
                     text: 'Delete',
                     style: 'destructive',
-                    onPress: () => {
-                        setEmployees(employees.filter(e => e.id !== id));
-                        closeAlert();
+                    onPress: async () => {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/api/employees/${id}`, {
+                                method: 'DELETE',
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                setEmployees(employees.filter(e => e._id !== id));
+                                closeAlert();
+                            } else {
+                                Alert.alert('Error', result.message || 'Delete failed');
+                            }
+                        } catch (error) {
+                            Alert.alert('Error', 'Network request failed');
+                        }
                     }
                 }
             ]);
@@ -249,7 +326,7 @@ export function ProviderEmployeesScreen() {
             `Manage ${employee.name}`,
             [
                 { text: 'Edit', onPress: () => { closeAlert(); handleEditStart(employee); } },
-                { text: 'Delete', style: 'destructive', onPress: () => handleDelete(employee.id) },
+                { text: 'Delete', style: 'destructive', onPress: () => handleDelete(employee._id) },
                 { text: 'Cancel', style: 'cancel', onPress: closeAlert },
             ]
         );
@@ -266,6 +343,43 @@ export function ProviderEmployeesScreen() {
         setShowDetailModal(true);
     };
 
+    const handleCall = (phoneNumber: string) => {
+        if (!phoneNumber) return;
+        const cleanNumber = phoneNumber.replace(/\D/g, '');
+        const url = `tel:${cleanNumber}`;
+        Linking.openURL(url).catch(err => {
+            console.error('An error occurred', err);
+            Alert.alert('Error', 'Could not open phone dialer');
+        });
+    };
+
+    const handleWhatsApp = (phoneNumber: string) => {
+        if (!phoneNumber) return;
+        const cleanNumber = phoneNumber.replace(/\D/g, '');
+        // Default Saudi prefix if 10 digits starting with 05 or 9 digits starting with 5
+        let waNumber = cleanNumber;
+        if (cleanNumber.length === 10 && cleanNumber.startsWith('05')) {
+            waNumber = `966${cleanNumber.substring(1)}`;
+        } else if (cleanNumber.length === 9 && cleanNumber.startsWith('5')) {
+            waNumber = `966${cleanNumber}`;
+        }
+
+        const url = `https://wa.me/${waNumber}`;
+        Linking.openURL(url).catch(err => {
+            console.error('An error occurred', err);
+            Alert.alert('Error', 'Could not open WhatsApp');
+        });
+    };
+
+    if (isLoading && employees.length === 0) {
+        return (
+            <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={theme.tint} />
+                <Text style={{ color: theme.subText, marginTop: 12 }}>Loading Employees...</Text>
+            </View>
+        );
+    }
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header */}
@@ -277,10 +391,19 @@ export function ProviderEmployeesScreen() {
             </View>
 
             {/* List */}
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {employees.map((employee) => (
+            <ScrollView
+                style={styles.content}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 100 }}
+            >
+                {employees.length === 0 ? (
+                    <View style={{ marginTop: 60, alignItems: 'center' }}>
+                        <MaterialCommunityIcons name="account-group-outline" size={80} color={theme.border} />
+                        <Text style={{ color: theme.subText, marginTop: 16, fontSize: 16 }}>No employees registered yet</Text>
+                    </View>
+                ) : employees.map((employee) => (
                     <TouchableOpacity
-                        key={employee.id}
+                        key={employee._id}
                         style={[styles.employeeCard, { backgroundColor: theme.cardBackground }]}
                         onPress={() => openDetailModal(employee)}
                         activeOpacity={0.7}
@@ -288,7 +411,7 @@ export function ProviderEmployeesScreen() {
                         <View style={styles.employeeInfo}>
                             <View style={styles.avatarContainer}>
                                 {employee.avatar ? (
-                                    <Image source={{ uri: employee.avatar }} style={styles.avatar} />
+                                    <Image source={{ uri: employee.avatar as string }} style={styles.avatar} />
                                 ) : (
                                     <View style={[styles.avatar, { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }]}>
                                         <MaterialCommunityIcons name="account" size={24} color={theme.subText} />
@@ -300,17 +423,23 @@ export function ProviderEmployeesScreen() {
                                 ]} />
                             </View>
                             <View style={styles.employeeDetails}>
-                                <Text style={[styles.employeeName, { color: theme.text }]}>{employee.name}</Text>
-                                <Text style={styles.employeeRole}>{employee.role}</Text>
+                                <Text style={[styles.employeeName, { color: theme.text }]} numberOfLines={1}>{employee.name}</Text>
+                                <Text style={styles.employeeRole}>{employee.employeeType}</Text>
                             </View>
                         </View>
-                        {/* Actions: Phone, Message, AND 3-Dots */}
+                        {/* Actions: Phone, WhatsApp, AND 3-Dots */}
                         <View style={styles.actions}>
-                            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.background }]}>
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: theme.background }]}
+                                onPress={() => handleCall(employee.number)}
+                            >
                                 <MaterialCommunityIcons name="phone" size={20} color="#007AFF" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.background }]}>
-                                <MaterialCommunityIcons name="message" size={20} color="#007AFF" />
+                            <TouchableOpacity
+                                style={[styles.actionButton, { backgroundColor: theme.background }]}
+                                onPress={() => handleWhatsApp(employee.number)}
+                            >
+                                <MaterialCommunityIcons name="whatsapp" size={20} color="#25D366" />
                             </TouchableOpacity>
                             <TouchableOpacity style={[{ alignSelf: 'center' }]} onPress={() => handleShowOptions(employee)}>
                                 <MaterialCommunityIcons name="dots-vertical" size={20} color={theme.text} />
@@ -365,13 +494,17 @@ export function ProviderEmployeesScreen() {
 
                             <FormInput label="Full Name" required value={newEmployee.name} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, name: text })} placeholder="e.g. John Doe" theme={theme} />
 
+                            <FormInput label="Phone Number" required value={newEmployee.number} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, number: text })} placeholder="e.g. 5xxxxxxx" keyboardType="phone-pad" theme={theme} />
+
+                            <FormInput label="Account Password" required={!isEditing} value={newEmployee.password} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, password: text })} placeholder={isEditing ? "(Leave blank to keep current)" : "Enter login password"} theme={theme} />
+
                             {/* Role Dropdown */}
                             <View style={{ marginBottom: 16 }}>
                                 <FormLabel text="Employee Type" required theme={theme} />
                                 <TouchableOpacity
                                     style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
                                     onPress={() => setIsRoleOpen(!isRoleOpen)}>
-                                    <Text style={{ color: newEmployee.role ? theme.text : theme.subText }}>{newEmployee.role || 'Select Role'}</Text>
+                                    <Text style={{ color: newEmployee.employeeType ? theme.text : theme.subText }}>{newEmployee.employeeType || 'Select Role'}</Text>
                                     <MaterialCommunityIcons name={isRoleOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
                                 </TouchableOpacity>
 
@@ -381,19 +514,34 @@ export function ProviderEmployeesScreen() {
                                             <TouchableOpacity
                                                 key={role}
                                                 style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
-                                                onPress={() => { setNewEmployee({ ...newEmployee, role: role }); setIsRoleOpen(false); }}>
+                                                onPress={() => { setNewEmployee({ ...newEmployee, employeeType: role }); setIsRoleOpen(false); }}>
                                                 <Text style={{ color: theme.text }}>{role}</Text>
-                                                {newEmployee.role === role && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                                {newEmployee.employeeType === role && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
                                             </TouchableOpacity>
                                         ))}
                                     </View>
                                 )}
                             </View>
 
-                            <FormInput label="Salary (SAR)" required value={newEmployee.salary} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, salary: text })} placeholder="0.00" keyboardType="numeric" theme={theme} />
+                            <View style={{ flexDirection: 'row', gap: 12 }}>
+                                <View style={{ flex: 1 }}>
+                                    <FormInput label="Salary (SAR)" required value={newEmployee.salary} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, salary: text })} placeholder="0.00" keyboardType="numeric" theme={theme} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <FormInput label="Commission (%)" value={newEmployee.commission} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, commission: text })} placeholder="0" keyboardType="numeric" theme={theme} />
+                                </View>
+                            </View>
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveEmployee}>
-                                <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Add Employee'}</Text>
+                            <TouchableOpacity
+                                style={[styles.saveButton, isLoading && { opacity: 0.7 }]}
+                                onPress={handleSaveEmployee}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <ActivityIndicator size="small" color="#1C1C1E" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>{isEditing ? 'Save Changes' : 'Add Employee'}</Text>
+                                )}
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
@@ -408,7 +556,7 @@ export function ProviderEmployeesScreen() {
                             <View style={styles.detailHeader}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                     {selectedEmployee.avatar ? (
-                                        <Image source={{ uri: selectedEmployee.avatar }} style={styles.detailAvatar} />
+                                        <Image source={{ uri: selectedEmployee.avatar as string }} style={styles.detailAvatar} />
                                     ) : (
                                         <View style={[styles.detailAvatar, { backgroundColor: theme.background, alignItems: 'center', justifyContent: 'center' }]}>
                                             <MaterialCommunityIcons name="account" size={40} color={theme.subText} />
@@ -430,9 +578,24 @@ export function ProviderEmployeesScreen() {
 
                             <ScrollView showsVerticalScrollIndicator={false}>
                                 <View style={styles.detailSection}>
-                                    <DetailRow icon="briefcase-outline" label="Role" value={selectedEmployee.role} theme={theme} />
+                                    <View style={styles.detailRow}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', width: 100 }}>
+                                            <MaterialCommunityIcons name="phone-outline" size={20} color={theme.subText} style={{ marginRight: 8 }} />
+                                            <Text style={[styles.detailLabel, { color: theme.subText }]}>Phone</Text>
+                                        </View>
+                                        <Text style={[styles.detailValue, { color: theme.text, marginRight: 8 }]}>{selectedEmployee.number}</Text>
+                                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                                            <TouchableOpacity onPress={() => handleCall(selectedEmployee.number)} style={styles.miniActionBtn}>
+                                                <MaterialCommunityIcons name="phone" size={18} color="#007AFF" />
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={() => handleWhatsApp(selectedEmployee.number)} style={styles.miniActionBtn}>
+                                                <MaterialCommunityIcons name="whatsapp" size={18} color="#25D366" />
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
+                                    <DetailRow icon="briefcase-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
                                     <DetailRow icon="cash" label="Salary" value={`${selectedEmployee.salary} SAR`} theme={theme} />
-                                    <DetailRow icon="card-account-details-outline" label="ID" value={`EMP-${selectedEmployee.id}`} theme={theme} />
+                                    <DetailRow icon="percent-outline" label="Commission" value={`${selectedEmployee.commission || '0'} %`} theme={theme} />
                                 </View>
                             </ScrollView>
 
@@ -448,7 +611,7 @@ export function ProviderEmployeesScreen() {
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.actionBtn, styles.deleteBtn, { backgroundColor: theme.background }]}
-                                    onPress={() => handleDelete(selectedEmployee.id, true)}>
+                                    onPress={() => handleDelete(selectedEmployee._id, true)}>
                                     <MaterialCommunityIcons name="delete" size={20} color="#FF3B30" />
                                     <Text style={[styles.actionBtnText, styles.deleteBtnText]}>Delete</Text>
                                 </TouchableOpacity>
@@ -532,4 +695,5 @@ const styles = StyleSheet.create({
     customAlertButtonsContainer: { width: '100%' },
     customAlertButton: { paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     customAlertButtonText: { fontSize: 16 },
+    miniActionBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
 });

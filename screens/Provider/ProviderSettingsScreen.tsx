@@ -63,6 +63,18 @@ export function ProviderSettingsScreen({ onLogout, navigation }: ProviderSetting
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                    onPress={() => navigation?.navigate('Employees')}
+                >
+                    <View style={styles.settingLeft}>
+                        <View style={[styles.iconBox, { backgroundColor: theme.inputBackground }]}>
+                            <MaterialCommunityIcons name="account-group" size={20} color={theme.text} />
+                        </View>
+                        <Text style={[styles.settingText, { color: theme.text }]}>Manage Employees</Text>
+                    </View>
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: theme.border }]}
                     onPress={() => navigation?.navigate('PaymentInfo')}
                 >
                     <View style={styles.settingLeft}>
