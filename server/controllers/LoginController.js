@@ -26,8 +26,8 @@ const login = async (req, res) => {
         let userType = '';
 
         // If role is explicitly provided and NOT customer, skip customer check or prioritize provider
-        // Assuming 'owner', 'cashier', 'technician', 'freelancer', 'individual' imply looking in providers collection.
-        const isProviderRole = role && ['owner', 'cashier', 'technician', 'freelancer', 'individual'].includes(role);
+        // Assuming 'owner', 'workshop', 'cashier', 'technician', 'freelancer', 'individual' imply looking in providers collection.
+        const isProviderRole = role && ['owner', 'workshop', 'cashier', 'technician', 'freelancer', 'individual'].includes(role);
 
         if (!isProviderRole) {
             console.log('Stage 1: Searching in customers collection...');
@@ -60,7 +60,7 @@ const login = async (req, res) => {
                 user = await providersCollection.findOne(query);
                 if (user) userType = 'individual';
             }
-            else if (role === 'owner') {
+            else if (role === 'owner' || role === 'workshop') {
                 const query = {
                     mobileNumber: searchIdentifier,
                     type: 'workshop'
@@ -70,29 +70,18 @@ const login = async (req, res) => {
                 if (user) userType = 'workshop';
             }
             else if (role === 'technician' || role === 'cashier') {
-                console.log(`Querying employee (${role}) in workshops...`);
-                // Search inside employees array of any workshop
-                const workshop = await providersCollection.findOne({
-                    employees: {
-                        $elemMatch: {
-                            number: searchIdentifier,
-                            employeeType: role
-                        }
-                    }
+                console.log(`Querying employee (${role}) in employees collection...`);
+                const employeesCollection = db.collection('employees');
+
+                // Search in dedicated employees collection
+                user = await employeesCollection.findOne({
+                    number: searchIdentifier,
+                    employeeType: { $regex: new RegExp(`^${role}$`, 'i') } // Case insensitive match
                 });
 
-                if (workshop) {
-                    const employee = workshop.employees.find(e => e.number === searchIdentifier && e.employeeType === role);
-                    if (employee) {
-                        user = {
-                            ...employee,
-                            workshopId: workshop._id,
-                            workshopName: workshop.workshopName,
-                            type: role
-                        };
-                        userType = role;
-                        console.log('Found employee in workshop');
-                    }
+                if (user) {
+                    userType = user.employeeType.toLowerCase();
+                    console.log(`Found ${userType} in employees collection`);
                 }
             }
             else {
@@ -110,8 +99,17 @@ const login = async (req, res) => {
 
         console.log('Login Result: USER FOUND, Type:', userType);
 
-        // --- PASSWORD CHECK SKIPPED AS REQUESTED ---
-        console.log('Password check bypassed for:', searchIdentifier);
+        // --- PASSWORD CHECK ---
+        // For workshop owners and individuals, use their respective collection logic
+        // For employees, check against their hashed password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            console.log('Login Result: INVALID PASSWORD');
+            return res.status(401).json({ success: false, message: 'Invalid phone or password' });
+        }
+
+        console.log('Password verified for:', searchIdentifier);
 
         // Return User Data (excluding password)
         const { password: _, ...userData } = user;

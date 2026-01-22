@@ -43,29 +43,7 @@ export const ServiceProductTabs = ({
                 </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-                style={[
-                    styles.tab,
-                    activeTab === 'products' && styles.activeTab,
-                    {
-                        backgroundColor:
-                            activeTab === 'products' ? theme.tint : 'transparent',
-                    },
-                ]}
-                onPress={() => onTabChange('products')}
-            >
-                <Text
-                    style={[
-                        styles.tabText,
-                        {
-                            color: activeTab === 'products' ? '#1C1C1E' : theme.subText,
-                            fontWeight: activeTab === 'products' ? 'bold' : '600',
-                        },
-                    ]}
-                >
-                    {t('products.parts')} ({counts.products})
-                </Text>
-            </TouchableOpacity>
+
         </View>
     );
 };

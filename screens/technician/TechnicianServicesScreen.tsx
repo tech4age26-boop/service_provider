@@ -10,7 +10,6 @@ import TechnicianHeader from '../../components/technician_header/technician-head
 
 import { ServiceProductTabs } from '../../components/services/service-product-tabs';
 import { ServiceList } from '../../components/services/service-list';
-import { ProductList } from '../../components/services/product-list';
 import { AddEditSheet } from '../../components/services/add-edit-sheet';
 import { FAB } from '../../components/common/FAB';
 
@@ -23,7 +22,7 @@ export function TechnicianServicesScreen() {
   const { t } = useTranslation();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
+  const [activeTab, setActiveTab] = useState<'services'>('services');
   const [sheetMode, setSheetMode] = useState<SheetMode>('add');
   const [editingItem, setEditingItem] = useState<Partial<Service> | null>(null);
 
@@ -174,21 +173,16 @@ export function TechnicianServicesScreen() {
           subtitle={t('technician.services_subtitle')}
         />
 
-        <ServiceProductTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          counts={{ services: services.length, products: products.length }}
-        />
+        {/* Note: ServiceProductTabs hidden as per request to have only services */}
+        <View style={{ height: 10 }} />
 
         <View style={styles.content}>
           {isLoading ? (
             <View style={styles.loader}>
               <ActivityIndicator size="large" color={theme.tint} />
             </View>
-          ) : activeTab === 'services' ? (
-            <ServiceList data={services as any} onEdit={handleEdit} onDelete={handleDelete} />
           ) : (
-            <ProductList data={products as any} onEdit={handleEdit} onDelete={handleDelete} />
+            <ServiceList data={services as any} onEdit={handleEdit} onDelete={handleDelete} />
           )}
         </View>
 

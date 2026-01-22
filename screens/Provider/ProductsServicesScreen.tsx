@@ -2,7 +2,8 @@
  * Provider Dashboard - Products & Services Screen
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     StyleSheet,
     Text,
@@ -132,7 +133,8 @@ export function ProductsServicesScreen() {
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Service | null>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'all' | 'services' | 'products'>('all');
+    const [activeTab, setActiveTab] = useState<'service'>('service');
+    const [customCategories, setCustomCategories] = useState<any[]>([]);
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -159,6 +161,30 @@ export function ProductsServicesScreen() {
         fetchItems();
     }, []);
 
+    useFocusEffect(
+        useCallback(() => {
+            fetchCategories();
+        }, [])
+    );
+
+    const fetchCategories = async () => {
+        try {
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            if (!userDataStr) return;
+            const userData = JSON.parse(userDataStr);
+            const providerId = userData.id || userData._id;
+
+            const response = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=service`);
+            const result = await response.json();
+
+            if (result.success) {
+                setCustomCategories(result.categories);
+            }
+        } catch (error) {
+            console.error('Fetch Categories Error:', error);
+        }
+    };
+
     const fetchItems = async () => {
         try {
             setIsLoading(true);
@@ -181,10 +207,7 @@ export function ProductsServicesScreen() {
     };
 
     const filteredItems = items.filter(item => {
-        if (activeTab === 'all') return true;
-        if (activeTab === 'services') return item.category === 'service';
-        if (activeTab === 'products') return item.category === 'product';
-        return true;
+        return item.category === 'service';
     });
 
     // --- Actions ---
@@ -196,17 +219,6 @@ export function ProductsServicesScreen() {
 
     const closeAlert = () => {
         setAlertVisible(false);
-    };
-
-    const switchFormType = (type: 'service' | 'product') => {
-        if (newItem.category !== type) {
-            setNewItem({
-                ...initialFormState,
-                category: type,
-                subCategory: type === 'product' ? PRODUCT_CATEGORIES[0] : '',
-            });
-            setIsCategoryOpen(false);
-        }
     };
 
     const handleImagePick = async () => {
@@ -389,11 +401,10 @@ export function ProductsServicesScreen() {
     };
 
     const openAddModal = () => {
-        const defaultCategory = activeTab === 'products' ? 'product' : 'service';
         setNewItem({
             ...initialFormState,
-            category: defaultCategory,
-            subCategory: defaultCategory === 'product' ? PRODUCT_CATEGORIES[0] : '',
+            category: 'service',
+            subCategory: '',
         });
         setIsEditing(false);
         setShowAddModal(true);
@@ -423,21 +434,12 @@ export function ProductsServicesScreen() {
                 </TouchableOpacity>
             </View>
 
-            <View style={[styles.tabContainer, { backgroundColor: theme.cardBackground }]}>
-                {[
-                    { key: 'all', label: t('common.view_all') },
-                    { key: 'services', label: t('products.services') },
-                    { key: 'products', label: t('products.parts') }
-                ].map(tab => (
-                    <TouchableOpacity
-                        key={tab.key}
-                        style={[styles.tab, activeTab === tab.key && styles.activeTab]}
-                        onPress={() => setActiveTab(tab.key as any)}>
-                        <Text style={[styles.tabText, activeTab === tab.key && styles.activeTabText, activeTab !== tab.key && { color: theme.subText }]}>
-                            {tab.label} ({tab.key === 'all' ? items.length : items.filter(i => i.category === (tab.key === 'services' ? 'service' : 'product')).length})
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+            <View style={[styles.tabContainer, { backgroundColor: theme.cardBackground, justifyContent: 'center' }]}>
+                <View style={[styles.tab, styles.activeTab, { paddingHorizontal: 30 }]}>
+                    <Text style={[styles.tabText, styles.activeTabText]}>
+                        All Services ({items.filter(i => i.category === 'service').length})
+                    </Text>
+                </View>
             </View>
 
             {/* List */}
@@ -446,15 +448,15 @@ export function ProductsServicesScreen() {
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
                         <ActivityIndicator size="large" color="#F4C430" />
                     </View>
-                ) : filteredItems.length === 0 ? (
+                ) : items.filter(i => i.category === 'service').length === 0 ? (
                     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 }}>
                         <MaterialCommunityIcons name="package-variant" size={60} color={theme.subText} />
                         <Text style={{ color: theme.subText, fontSize: 16, marginTop: 10 }}>No items found</Text>
                     </View>
                 ) : (
-                    filteredItems.map((item) => (
+                    filteredItems.map((item, index) => (
                         <TouchableOpacity
-                            key={(item as any)._id || item.id}
+                            key={(item as any)._id || item.id || `item-${index}`}
                             style={[styles.itemCard, { backgroundColor: theme.cardBackground, opacity: item.status === 'inactive' ? 0.6 : 1 }]}
                             onPress={() => openDetailModal(item)}
                             activeOpacity={0.7}
@@ -510,20 +512,8 @@ export function ProductsServicesScreen() {
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-                            {/* Type Switcher */}
-                            {!isEditing && (
-                                <View style={styles.categoryContainer}>
-                                    {['service', 'product'].map((type) => (
-                                        <TouchableOpacity
-                                            key={type}
-                                            style={[styles.categoryBtn, { borderColor: theme.border }, newItem.category === type && styles.categoryBtnActive]}
-                                            onPress={() => switchFormType(type as any)}>
-                                            <MaterialCommunityIcons name={type === 'service' ? "wrench" : "package-variant"} size={20} color={newItem.category === type ? '#F4C430' : theme.subText} />
-                                            <Text style={[styles.categoryText, { color: theme.subText }, newItem.category === type && styles.categoryTextActive]}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
+                            {/* Type Switcher removed as we only add services now */}
+
 
                             {/* Status */}
                             <View style={[styles.formRow, { justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }]}>
@@ -554,41 +544,18 @@ export function ProductsServicesScreen() {
                                 </ScrollView>
                             </View>
 
-                            <FormInput label="Product Name" required value={newItem.name} onChangeText={(text: string) => setNewItem({ ...newItem, name: text })} placeholder="Name" theme={theme} />
+                            <FormInput label="Service Name" required value={newItem.name} onChangeText={(text: string) => setNewItem({ ...newItem, name: text })} placeholder="Service Name" theme={theme} />
 
-                            {/* Category - Product Only */}
-                            {newItem.category === 'product' && (
-                                <View style={{ marginBottom: 16 }}>
-                                    <FormLabel text="Category" required theme={theme} />
-                                    <TouchableOpacity
-                                        style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
-                                        onPress={() => setIsCategoryOpen(!isCategoryOpen)}>
-                                        <Text style={{ color: newItem.subCategory ? theme.text : theme.subText }}>{newItem.subCategory || 'Select Category'}</Text>
-                                        <MaterialCommunityIcons name={isCategoryOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
-                                    </TouchableOpacity>
-
-                                    {isCategoryOpen && (
-                                        <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                                            {PRODUCT_CATEGORIES.map((cat) => (
-                                                <TouchableOpacity
-                                                    key={cat}
-                                                    style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
-                                                    onPress={() => { setNewItem({ ...newItem, subCategory: cat }); setIsCategoryOpen(false); }}>
-                                                    <Text style={{ color: theme.text }}>{cat}</Text>
-                                                    {newItem.subCategory === cat && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
-                                                </TouchableOpacity>
-                                            ))}
-                                        </View>
-                                    )}
-                                </View>
-                            )}
 
                             {/* Service Types - Service Only */}
                             {newItem.category === 'service' && (
                                 <View style={{ marginBottom: 16 }}>
                                     <FormLabel text="Service Type (Multi Select)" required theme={theme} />
                                     <View style={styles.chipContainer}>
-                                        {SERVICE_CATEGORIES.map((type) => {
+                                        {[
+                                            ...SERVICE_CATEGORIES,
+                                            ...customCategories.map(c => c.name)
+                                        ].map((type) => {
                                             const isSelected = newItem.serviceTypes?.includes(type);
                                             return (
                                                 <TouchableOpacity

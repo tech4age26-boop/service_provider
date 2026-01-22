@@ -11,6 +11,7 @@ import {
 } from 'react-native-safe-area-context';
 import { AuthScreen } from './screens/auth/AuthScreen';
 import { TechnicianDashboard } from './tabBar/TechnicianDashboard';
+import { ProviderDashboard } from './tabBar/ProviderDashboard';
 
 import { ThemeContext, lightTheme, darkTheme, useTheme } from './theme/ThemeContext';
 export { useTheme };
@@ -18,6 +19,7 @@ export { useTheme };
 function App(): React.JSX.Element {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<'individual' | 'workshop' | string | null>(null);
   const [isLanguageSelected, setIsLanguageSelected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +32,13 @@ function App(): React.JSX.Element {
       const selected = await AsyncStorage.getItem('has-selected-language');
       setIsLanguageSelected(selected === 'true');
       const userData = await AsyncStorage.getItem('user_data');
-      setIsAuthenticated(!!userData);
+      if (userData) {
+        const user = JSON.parse(userData);
+        setUserRole(user.type);
+        setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
+      }
     } catch (error) {
       setIsLanguageSelected(false);
       setIsAuthenticated(false);
@@ -63,9 +71,19 @@ function App(): React.JSX.Element {
         {!isLanguageSelected ? (
           <LanguageScreen onSelect={() => setIsLanguageSelected(true)} />
         ) : isAuthenticated ? (
-          <TechnicianDashboard onLogout={() => setIsAuthenticated(false)} />
+          userRole === 'workshop' ? (
+            <ProviderDashboard onLogout={() => {
+              setIsAuthenticated(false);
+              setUserRole(null);
+            }} />
+          ) : (
+            <TechnicianDashboard onLogout={() => {
+              setIsAuthenticated(false);
+              setUserRole(null);
+            }} />
+          )
         ) : (
-          <AuthScreen onLogin={() => setIsAuthenticated(true)} />
+          <AuthScreen onLogin={initializeApp} />
         )}
       </SafeAreaProvider>
     </ThemeContext.Provider>
