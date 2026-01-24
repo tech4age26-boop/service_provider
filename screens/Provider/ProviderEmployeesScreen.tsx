@@ -120,13 +120,17 @@ const CustomAlert = ({ visible, title, message, buttons, onClose, theme }: any) 
     </Modal>
 );
 
+import { useNavigation } from '@react-navigation/native';
+
 export function ProviderEmployeesScreen() {
     const { theme } = useTheme();
     const { t } = useTranslation();
+    const navigation = useNavigation<any>();
 
 
     // --- State ---
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [workshopId, setWorkshopId] = useState<string | null>(null);
 
@@ -157,8 +161,11 @@ export function ProviderEmployeesScreen() {
     // --- API Interactions ---
 
     useEffect(() => {
-        loadEmployees();
-    }, []);
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadEmployees();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const loadEmployees = async () => {
         try {
@@ -168,17 +175,22 @@ export function ProviderEmployeesScreen() {
                 const wId = user.id || user._id;
                 setWorkshopId(wId);
 
-                const response = await fetch(`${API_BASE_URL}/api/employees?workshopId=${wId}`);
-                const result = await response.json();
+                // Fetch Employees
+                const empResponse = await fetch(`${API_BASE_URL}/api/employees?workshopId=${wId}`);
+                const empResult = await empResponse.json();
+                if (empResult.success) {
+                    setEmployees(empResult.data);
+                }
 
-                if (result.success) {
-                    setEmployees(result.data);
-                } else {
-                    console.error('Failed to fetch employees:', result.message);
+                // Fetch Expenses
+                const expResponse = await fetch(`${API_BASE_URL}/api/expenses?providerId=${wId}`);
+                const expResult = await expResponse.json();
+                if (expResult.success) {
+                    setExpenses(expResult.expenses || []);
                 }
             }
         } catch (error) {
-            console.error('Error loading employees:', error);
+            console.error('Error loading data:', error);
         } finally {
             setIsLoading(false);
         }
@@ -596,6 +608,63 @@ export function ProviderEmployeesScreen() {
                                     <DetailRow icon="briefcase-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
                                     <DetailRow icon="cash" label="Salary" value={`${selectedEmployee.salary} SAR`} theme={theme} />
                                     <DetailRow icon="percent-outline" label="Commission" value={`${selectedEmployee.commission || '0'} %`} theme={theme} />
+
+                                    {/* Financial Summary */}
+                                    <View style={{ marginTop: 20, padding: 15, borderRadius: 12, backgroundColor: theme.background }}>
+                                        <Text style={{ fontWeight: 'bold', color: theme.text, marginBottom: 10 }}>Payment Summary</Text>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                            <Text style={{ color: theme.subText }}>Salary Paid:</Text>
+                                            <Text style={{ color: '#2ECC71', fontWeight: 'bold' }}>
+                                                {expenses.filter(e => e.recipientId === selectedEmployee._id && e.category === 'Salaries').reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(2)} SAR
+                                            </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                            <Text style={{ color: theme.subText }}>Advance Given:</Text>
+                                            <Text style={{ color: '#F4C430', fontWeight: 'bold' }}>
+                                                {expenses.filter(e => e.recipientId === selectedEmployee._id && e.category === 'Advance').reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(2)} SAR
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* History */}
+                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
+                                        <Text style={{ fontWeight: 'bold', color: theme.text }}>Payment History</Text>
+                                        <View style={{ backgroundColor: theme.background, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
+                                            <Text style={{ fontSize: 10, color: theme.subText }}>Last 10 Records</Text>
+                                        </View>
+                                    </View>
+
+                                    {expenses.filter(e => e.recipientId === selectedEmployee._id).length === 0 ? (
+                                        <View style={{ padding: 20, alignItems: 'center' }}>
+                                            <MaterialCommunityIcons name="cash-remove" size={40} color={theme.subText} />
+                                            <Text style={{ color: theme.subText, fontSize: 12, marginTop: 8 }}>No payments found for this employee</Text>
+                                        </View>
+                                    ) : (
+                                        expenses.filter(e => e.recipientId === selectedEmployee._id)
+                                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                            .slice(0, 10) // Show only last 10
+                                            .map((exp, idx) => (
+                                                <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: theme.border }}>
+                                                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: exp.category === 'Salaries' ? '#E8F5E9' : '#FFF3E0', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                                                            <MaterialCommunityIcons
+                                                                name={exp.category === 'Salaries' ? "cash" : "hand-coin"}
+                                                                size={18}
+                                                                color={exp.category === 'Salaries' ? '#2ECC71' : '#F4C430'}
+                                                            />
+                                                        </View>
+                                                        <View style={{ flex: 1 }}>
+                                                            <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>{exp.category}</Text>
+                                                            <Text style={{ color: theme.subText, fontSize: 12 }}>{exp.description || 'No description'}</Text>
+                                                        </View>
+                                                    </View>
+                                                    <View style={{ alignItems: 'flex-end' }}>
+                                                        <Text style={{ color: theme.text, fontWeight: 'bold' }}>{exp.amount.toFixed(2)} SAR</Text>
+                                                        <Text style={{ color: theme.subText, fontSize: 10 }}>{new Date(exp.date).toLocaleDateString()}</Text>
+                                                    </View>
+                                                </View>
+                                            ))
+                                    )}
                                 </View>
                             </ScrollView>
 
@@ -671,7 +740,7 @@ const styles = StyleSheet.create({
     dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
 
     // Detail Modal
-    detailModalContent: { backgroundColor: '#FFFFFF', padding: 24, margin: 20, borderRadius: 24, maxHeight: '80%', width: width - 40, alignSelf: 'center', bottom: '10%' },
+    detailModalContent: { backgroundColor: '#FFFFFF', padding: 24, margin: 20, borderRadius: 24, maxHeight: '80%', width: width - 40, alignSelf: 'center' },
     detailHeader: { marginBottom: 20 },
     detailAvatar: { width: 80, height: 80, borderRadius: 40 },
     detailTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 8 },

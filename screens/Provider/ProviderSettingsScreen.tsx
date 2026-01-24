@@ -85,12 +85,15 @@ export function ProviderSettingsScreen({ onLogout, navigation }: ProviderSetting
                     </View>
                     <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.settingItem, { borderBottomColor: theme.border }]}>
+                <TouchableOpacity
+                    style={[styles.settingItem, { borderBottomColor: theme.border }]}
+                    onPress={() => navigation?.navigate('AddInvoice')}
+                >
                     <View style={styles.settingLeft}>
                         <View style={[styles.iconBox, { backgroundColor: theme.inputBackground }]}>
-                            <MaterialCommunityIcons name="wrench" size={20} color={theme.text} />
+                            <MaterialCommunityIcons name="file-document-outline" size={20} color={theme.text} />
                         </View>
-                        <Text style={[styles.settingText, { color: theme.text }]}>Services & Pricing</Text>
+                        <Text style={[styles.settingText, { color: theme.text }]}>Purchase Invoices</Text>
                     </View>
                     <MaterialCommunityIcons name="chevron-right" size={20} color={theme.subText} />
                 </TouchableOpacity>

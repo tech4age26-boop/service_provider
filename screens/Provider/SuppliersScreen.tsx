@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Modal, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -24,7 +24,11 @@ export function SuppliersScreen({ navigation }: any) {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedSupplierForDetail, setSelectedSupplierForDetail] = useState<Supplier | null>(null);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [invoices, setInvoices] = useState<any[]>([]);
+    const [expenses, setExpenses] = useState<any[]>([]);
     const [formData, setFormData] = useState({
         name: '',
         number: '',
@@ -33,8 +37,11 @@ export function SuppliersScreen({ navigation }: any) {
     });
 
     useEffect(() => {
-        fetchSuppliers();
-    }, []);
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchSuppliers();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const fetchSuppliers = async () => {
         try {
@@ -44,14 +51,30 @@ export function SuppliersScreen({ navigation }: any) {
             const userData = JSON.parse(userDataStr);
             const providerId = userData.id || userData._id;
 
-            const response = await fetch(`${API_BASE_URL}/api/suppliers?providerId=${providerId}`);
-            const result = await response.json();
-            if (result.success) {
-                setSuppliers(result.suppliers || []);
+            // Fetch Suppliers
+            const sResponse = await fetch(`${API_BASE_URL}/api/suppliers?providerId=${providerId}`);
+            const sResult = await sResponse.json();
+            if (sResult.success) {
+                setSuppliers(sResult.suppliers || []);
             }
+
+            // Fetch Invoices
+            const iResponse = await fetch(`${API_BASE_URL}/api/invoices?providerId=${providerId}`);
+            const iResult = await iResponse.json();
+            if (iResult.success) {
+                setInvoices(iResult.invoices || []);
+            }
+
+            // Fetch Expenses
+            const eResponse = await fetch(`${API_BASE_URL}/api/expenses?providerId=${providerId}`);
+            const eResult = await eResponse.json();
+            if (eResult.success) {
+                setExpenses(eResult.expenses || []);
+            }
+
         } catch (e) {
-            console.error('Fetch Suppliers Error:', e);
-            Alert.alert('Error', 'Failed to load suppliers');
+            console.error('Fetch Data Error:', e);
+            Alert.alert('Error', 'Failed to load data');
         } finally {
             setIsLoading(false);
         }
@@ -125,20 +148,120 @@ export function SuppliersScreen({ navigation }: any) {
         }
     };
 
-    const renderRightActions = (id: string) => (
-        <View style={styles.rowActions}>
-            <TouchableOpacity style={[styles.actionBtn, styles.inactiveBtn]} onPress={() => handleMarkInactive(id)}>
-                <MaterialCommunityIcons name="pause" size={22} color="#fff" />
+    const openWhatsApp = (number: string) => {
+        const phone = number.replace(/[^\d+]/g, '');
+        Linking.openURL(`whatsapp://send?phone=${phone}`);
+    };
+
+    const callNumber = (number: string) => {
+        Linking.openURL(`tel:${number}`);
+    };
+
+    const renderRightActions = (supplier: Supplier) => (
+        <View style={styles.rowActionsRight}>
+            <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#25D366' }]} onPress={() => openWhatsApp(supplier.number)}>
+                <MaterialCommunityIcons name="whatsapp" size={20} color="#fff" />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDeleteSupplier(id)}>
-                <MaterialCommunityIcons name="delete" size={22} color="#fff" />
+            <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#34C759' }]} onPress={() => callNumber(supplier.number)}>
+                <MaterialCommunityIcons name="phone" size={20} color="#fff" />
             </TouchableOpacity>
         </View>
     );
 
+    const renderLeftActions = (id: string, status?: string) => (
+        <View style={styles.rowActionsLeft}>
+            <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: status === 'inactive' ? '#34C759' : '#C7C7CC' }]} onPress={() => handleMarkInactive(id)}>
+                <MaterialCommunityIcons name={status === 'inactive' ? "check" : "pause"} size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#FF3B30' }]} onPress={() => handleDeleteSupplier(id)}>
+                <MaterialCommunityIcons name="delete" size={20} color="#fff" />
+            </TouchableOpacity>
+        </View>
+    );
+
+    const renderDetailModal = () => {
+        if (!selectedSupplierForDetail) return null;
+
+        const supplierInvoices = invoices.filter(inv => inv.supplierId === selectedSupplierForDetail._id);
+        const supplierExpenses = expenses.filter(exp => exp.recipientId === selectedSupplierForDetail._id && exp.paidTo === 'Supplier');
+
+        const totalDebt = supplierInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+        const totalPaid = supplierExpenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const outstanding = totalDebt - totalPaid;
+
+        // Combine and sort history
+        const history = [
+            ...supplierInvoices.map(inv => ({ ...inv, type: 'debt' })),
+            ...supplierExpenses.map(exp => ({ ...exp, type: 'payment' }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return (
+            <Modal visible={showDetailModal} transparent animationType="slide" onRequestClose={() => setShowDetailModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: theme.cardBackground, height: '80%' }]}>
+                        <View style={styles.modalHeader}>
+                            <View>
+                                <Text style={[styles.modalTitle, { color: theme.text }]}>{selectedSupplierForDetail.name}</Text>
+                                <Text style={{ color: theme.subText }}>{selectedSupplierForDetail.number}</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+                                <MaterialCommunityIcons name="close" size={24} color={theme.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.statsRow}>
+                            <View style={[styles.statBox, { borderColor: theme.border }]}>
+                                <Text style={styles.statBoxLabel}>Outstanding</Text>
+                                <Text style={[styles.statBoxValue, { color: '#FF3B30' }]}>{outstanding.toFixed(2)} SAR</Text>
+                            </View>
+                            <View style={[styles.statBox, { borderColor: theme.border }]}>
+                                <Text style={styles.statBoxLabel}>Paid Amount</Text>
+                                <Text style={[styles.statBoxValue, { color: '#2ECC71' }]}>{totalPaid.toFixed(2)} SAR</Text>
+                            </View>
+                        </View>
+
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 20 }]}>Transaction History</Text>
+
+                        {history.length === 0 ? (
+                            <View style={{ alignItems: 'center', marginTop: 40 }}>
+                                <MaterialCommunityIcons name="file-document-outline" size={50} color={theme.subText} />
+                                <Text style={{ color: theme.subText, marginTop: 10 }}>No transactions recorded</Text>
+                            </View>
+                        ) : (
+                            <ScrollView showsVerticalScrollIndicator={false}>
+                                {history.map((item) => (
+                                    <View key={item._id} style={[styles.historyItem, { borderBottomColor: theme.border }]}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <MaterialCommunityIcons
+                                                name={item.type === 'debt' ? "arrow-up-circle" : "arrow-down-circle"}
+                                                size={24}
+                                                color={item.type === 'debt' ? "#FF3B30" : "#2ECC71"}
+                                                style={{ marginRight: 10 }}
+                                            />
+                                            <View>
+                                                <Text style={[styles.historyRef, { color: theme.text }]}>
+                                                    {item.type === 'debt' ? `Inv: ${item.referenceNumber}` : (item.description || 'Payment')}
+                                                </Text>
+                                                <Text style={{ color: theme.subText, fontSize: 12 }}>{new Date(item.date).toLocaleDateString()}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={[styles.historyAmount, { color: item.type === 'debt' ? theme.text : "#2ECC71" }]}>
+                                            {item.type === 'debt' ? '' : '- '}
+                                            {(item.totalAmount || item.amount).toFixed(2)} SAR
+                                        </Text>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+        );
+    };
+
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }] }>
-            <View style={[styles.header, { backgroundColor: theme.cardBackground }] }>
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color={theme.text} />
                 </TouchableOpacity>
@@ -166,27 +289,39 @@ export function SuppliersScreen({ navigation }: any) {
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     {suppliers.filter(s => s.status !== 'inactive').map((s) => (
-                        <Swipeable key={s._id} renderRightActions={() => renderRightActions(s._id)}>
-                            <View style={[styles.itemCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                                <View style={styles.itemMain}>
-                                    <View style={[styles.iconBox, { backgroundColor: theme.background }]}>
-                                        <MaterialCommunityIcons name="truck" size={24} color="#F4C430" />
-                                    </View>
-                                    <View style={styles.itemInfo}>
-                                        <Text style={[styles.itemName, { color: theme.text }]}>{s.name}</Text>
-                                        <Text style={styles.itemSku}>Phone: {s.number}</Text>
-                                        {s.address ? (
-                                            <Text style={[styles.itemSku]} numberOfLines={1}>Address: {s.address}</Text>
-                                        ) : null}
-                                    </View>
-                                    <View style={styles.itemPriceBox}>
-                                        {s.taxId ? (
-                                            <Text style={[styles.priceLabel, { color: theme.subText }]}>Tax ID</Text>
-                                        ) : null}
-                                        <Text style={styles.itemPrice}>{s.taxId || ''}</Text>
+                        <Swipeable
+                            key={s._id}
+                            renderRightActions={() => renderRightActions(s)}
+                            renderLeftActions={() => renderLeftActions(s._id, s.status)}
+                        >
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={() => { setSelectedSupplierForDetail(s); setShowDetailModal(true); }}
+                            >
+                                <View style={[styles.itemCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                    <View style={styles.itemMain}>
+                                        <View style={[styles.iconBox, { backgroundColor: theme.background }]}>
+                                            <MaterialCommunityIcons name="truck" size={24} color="#F4C430" />
+                                        </View>
+                                        <View style={styles.itemInfo}>
+                                            <Text style={[styles.itemName, { color: theme.text }]}>{s.name}</Text>
+                                            <Text style={styles.itemSku}>Phone: {s.number}</Text>
+                                            {s.address ? (
+                                                <Text style={[styles.itemSku]} numberOfLines={1}>Address: {s.address}</Text>
+                                            ) : null}
+                                        </View>
+                                        <View style={styles.itemPriceBox}>
+                                            <Text style={[styles.priceLabel, { color: theme.subText }]}>Outstanding</Text>
+                                            <Text style={[styles.itemPrice, { color: '#FF3B30' }]}>
+                                                {(
+                                                    invoices.filter(inv => inv.supplierId === s._id).reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) -
+                                                    expenses.filter(exp => exp.recipientId === s._id && exp.paidTo === 'Supplier').reduce((sum, exp) => sum + (exp.amount || 0), 0)
+                                                ).toFixed(2)}
+                                            </Text>
+                                        </View>
                                     </View>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         </Swipeable>
                     ))}
 
@@ -194,7 +329,11 @@ export function SuppliersScreen({ navigation }: any) {
                         <View style={{ marginTop: 12 }}>
                             <Text style={{ marginBottom: 8, color: theme.subText, fontWeight: '700' }}>Inactive</Text>
                             {suppliers.filter(s => s.status === 'inactive').map((s) => (
-                                <Swipeable key={s._id} renderRightActions={() => renderRightActions(s._id)}>
+                                <Swipeable
+                                    key={s._id}
+                                    renderRightActions={() => renderRightActions(s)}
+                                    renderLeftActions={() => renderLeftActions(s._id, s.status)}
+                                >
                                     <View style={[styles.itemCard, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                                         <View style={styles.itemMain}>
                                             <View style={[styles.iconBox, { backgroundColor: theme.background }]}>
@@ -208,10 +347,13 @@ export function SuppliersScreen({ navigation }: any) {
                                                 ) : null}
                                             </View>
                                             <View style={styles.itemPriceBox}>
-                                                {s.taxId ? (
-                                                    <Text style={[styles.priceLabel, { color: theme.subText }]}>Tax ID</Text>
-                                                ) : null}
-                                                <Text style={styles.itemPrice}>{s.taxId || ''}</Text>
+                                                <Text style={[styles.priceLabel, { color: theme.subText }]}>Outstanding</Text>
+                                                <Text style={[styles.itemPrice, { color: '#FF3B30' }]}>
+                                                    {(
+                                                        invoices.filter(inv => inv.supplierId === s._id).reduce((sum, inv) => sum + (inv.totalAmount || 0), 0) -
+                                                        expenses.filter(exp => exp.recipientId === s._id && exp.paidTo === 'Supplier').reduce((sum, exp) => sum + (exp.amount || 0), 0)
+                                                    ).toFixed(2)}
+                                                </Text>
                                             </View>
                                         </View>
                                     </View>
@@ -303,6 +445,7 @@ export function SuppliersScreen({ navigation }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
+            {renderDetailModal()}
         </View>
     );
 }
@@ -403,4 +546,68 @@ const styles = StyleSheet.create({
     },
     supplierName: { fontSize: 15, fontWeight: '600' },
     supplierDetail: { fontSize: 12, marginTop: 2 },
+    rowActionsRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 10,
+        height: '100%',
+        justifyContent: 'center',
+    },
+    rowActionsLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingRight: 10,
+        height: '100%',
+        justifyContent: 'center',
+    },
+    actionBtnCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginHorizontal: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 10,
+    },
+    statBox: {
+        flex: 1,
+        padding: 15,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginHorizontal: 4,
+        alignItems: 'center',
+    },
+    statBoxLabel: {
+        fontSize: 12,
+        color: '#8E8E93',
+        marginBottom: 5,
+    },
+    statBoxValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    historyItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+    },
+    historyRef: {
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    historyAmount: {
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
 });

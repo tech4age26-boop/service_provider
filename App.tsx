@@ -12,6 +12,7 @@ import {
 import { AuthScreen } from './screens/auth/AuthScreen';
 import { TechnicianDashboard } from './tabBar/TechnicianDashboard';
 import { ProviderDashboard } from './tabBar/ProviderDashboard';
+import { CashierPOSScreen } from './screens/Cashier/CashierPOSScreen';
 
 import { ThemeContext, lightTheme, darkTheme, useTheme } from './theme/ThemeContext';
 export { useTheme };
@@ -73,6 +74,11 @@ function App(): React.JSX.Element {
         ) : isAuthenticated ? (
           userRole === 'workshop' ? (
             <ProviderDashboard onLogout={() => {
+              setIsAuthenticated(false);
+              setUserRole(null);
+            }} />
+          ) : userRole === 'cashier' ? (
+            <CashierPOSScreen onLogout={() => {
               setIsAuthenticated(false);
               setUserRole(null);
             }} />

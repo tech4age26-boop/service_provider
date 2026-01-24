@@ -9,6 +9,9 @@ import { CategoryScreen } from '../screens/Provider/CategoryScreen';
 import { ProductsServicesScreen } from '../screens/Provider/ProductsServicesScreen';
 import { SuppliersScreen } from '../screens/Provider/SuppliersScreen';
 
+import { AddInvoiceScreen } from '../screens/Provider/AddInvoiceScreen';
+import { ExpensesScreen } from '../screens/Provider/ExpensesScreen';
+
 const Stack = createStackNavigator();
 
 interface ProviderSettingsStackProps {
@@ -28,6 +31,8 @@ export function ProviderSettingsStackNavigator({ onLogout }: ProviderSettingsSta
             <Stack.Screen name="Category" component={CategoryScreen} />
             <Stack.Screen name="OurServices" component={ProductsServicesScreen} />
             <Stack.Screen name="Suppliers" component={SuppliersScreen} />
+            <Stack.Screen name="AddInvoice" component={AddInvoiceScreen} />
+            <Stack.Screen name="Expenses" component={ExpensesScreen} />
             {/* Add other provider specific settings screens here if needed */}
         </Stack.Navigator>
     );

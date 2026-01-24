@@ -11,6 +11,8 @@ const orderController = require('./controllers/OrderController');
 const employeeController = require('./controllers/EmployeeController');
 const supplierController = require('./controllers/SupplierController');
 const inventoryController = require('./controllers/InventoryController');
+const invoiceController = require('./controllers/InvoiceController');
+const expenseController = require('./controllers/ExpenseController');
 
 const app = express();
 app.use(cors());
@@ -68,6 +70,16 @@ app.delete('/api/inventory/:id', inventoryController.deleteInventory);
 app.post('/api/inventory-categories', inventoryController.addCategory);
 app.get('/api/inventory-categories', inventoryController.getCategories);
 app.delete('/api/inventory-categories/:id', inventoryController.deleteCategory);
+
+// Invoice Routes
+app.post('/api/invoices', invoiceController.addInvoice);
+app.get('/api/invoices', invoiceController.getInvoices);
+app.delete('/api/invoices/:id', invoiceController.deleteInvoice);
+
+// Expense Routes
+app.post('/api/expenses', expenseController.addExpense);
+app.get('/api/expenses', expenseController.getExpenses);
+app.delete('/api/expenses/:id', expenseController.deleteExpense);
 
 // Health check
 app.get('/', (req, res) => res.send('Filter API is running'));

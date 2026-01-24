@@ -213,16 +213,16 @@ export function InventoryScreen({ navigation }: any) {
     const renderRightActions = (itemId: string, status?: string) => (
         <View style={styles.rowActions}>
             {status === 'inactive' ? (
-                <TouchableOpacity style={[styles.actionBtn, styles.activateBtn]} onPress={() => handleMarkActive(itemId)}>
-                    <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#34C759' }]} onPress={() => handleMarkActive(itemId)}>
+                    <MaterialCommunityIcons name="check" size={20} color="#fff" />
                 </TouchableOpacity>
             ) : (
-                <TouchableOpacity style={[styles.actionBtn, styles.inactiveBtn]} onPress={() => handleMarkInactive(itemId)}>
-                    <MaterialCommunityIcons name="pause" size={18} color="#fff" />
+                <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#C7C7CC' }]} onPress={() => handleMarkInactive(itemId)}>
+                    <MaterialCommunityIcons name="pause" size={20} color="#fff" />
                 </TouchableOpacity>
             )}
-            <TouchableOpacity style={[styles.actionBtn, styles.deleteBtn]} onPress={() => handleDeleteItem(itemId)}>
-                <MaterialCommunityIcons name="delete" size={18} color="#fff" />
+            <TouchableOpacity style={[styles.actionBtnCircle, { backgroundColor: '#FF3B30' }]} onPress={() => handleDeleteItem(itemId)}>
+                <MaterialCommunityIcons name="delete" size={20} color="#fff" />
             </TouchableOpacity>
         </View>
     );
@@ -234,10 +234,15 @@ export function InventoryScreen({ navigation }: any) {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                     <MaterialCommunityIcons name="arrow-left" size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.title, { color: theme.text }]}>Inventory Management</Text>
-                <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
-                    <MaterialCommunityIcons name="plus" size={24} color="#1C1C1E" />
-                </TouchableOpacity>
+                <Text style={[styles.title, { color: theme.text }]}>Inventory</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border }]} onPress={() => navigation.navigate('AddInvoice')}>
+                        <MaterialCommunityIcons name="file-document-plus" size={24} color="#F4C430" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)}>
+                        <MaterialCommunityIcons name="plus" size={24} color="#1C1C1E" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Content */}
@@ -522,12 +527,24 @@ const styles = StyleSheet.create({
     itemPriceBox: { alignItems: 'flex-end', flex: 1 },
     priceLabel: { fontSize: 11, marginBottom: 2 },
     itemPrice: { fontSize: 13, fontWeight: 'bold', color: '#2ECC71' },
-    rowActions: { flexDirection: 'row', alignItems: 'stretch' },
-    actionBtn: { width: 60, alignItems: 'center', justifyContent: 'center' },
-    deleteBtn: { backgroundColor: '#FF3B30' },
-    inactiveBtn: { backgroundColor: '#C7C7CC' },
-    activateBtn: { backgroundColor: '#34C759' },
-    actionText: { color: '#fff', fontWeight: '700' },
+    rowActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingLeft: 10,
+    },
+    actionBtnCircle: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalContent: {
         borderTopLeftRadius: 30,

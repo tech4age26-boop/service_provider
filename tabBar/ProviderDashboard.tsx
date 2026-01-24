@@ -76,6 +76,16 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                             <MaterialCommunityIcons name="cog" size={size} color={color} />
                         ),
                     }}
+                    listeners={({ navigation }) => ({
+                        tabPress: (e) => {
+                            e.preventDefault();
+                            navigation.reset({
+                                index: 0,
+                                routes: [{ name: 'SettingsHome' }],
+                            });
+                            navigation.navigate('SettingsTab');
+                        },
+                    })}
                 >
                     {(props) => <ProviderSettingsStackNavigator {...props} onLogout={onLogout} />}
                 </Tab.Screen>

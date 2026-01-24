@@ -91,12 +91,12 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
         try {
             const data = new FormData();
             data.append('type', step === 'workshop' ? 'workshop' : 'individual');
-            data.append('offersOutdoorServices', formData.offersOutdoorServices.toString());
-            data.append('services', JSON.stringify(formData.selectedServices));
-            data.append('address', formData.address);
-            data.append('latitude', formData.latitude.toString());
-            data.append('longitude', formData.longitude.toString());
-            data.append('password', formData.password);
+            data.append('offersOutdoorServices', (formData.offersOutdoorServices || false).toString());
+            data.append('services', JSON.stringify(formData.selectedServices || []));
+            data.append('address', formData.address || '');
+            data.append('latitude', (formData.latitude || 0).toString());
+            data.append('longitude', (formData.longitude || 0).toString());
+            data.append('password', formData.password || '');
 
             if (step === 'workshop') {
                 data.append('workshopName', formData.workshopName);

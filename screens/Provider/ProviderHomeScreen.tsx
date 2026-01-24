@@ -25,18 +25,25 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
 
+const API_BASE_URL = 'https://filter-server.vercel.app';
+
 export function ProviderHomeScreen() {
     const { theme } = useTheme();
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
     const [userData, setUserData] = useState<any>(null);
+    const [totalInvoices, setTotalInvoices] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [isSidebarVisible, setIsSidebarVisible] = useState(false);
     const sidebarWidth = Dimensions.get('window').width * 0.75;
     const slideAnim = useRef(new Animated.Value(sidebarWidth)).current;
 
     useEffect(() => {
-        loadUserData();
-    }, []);
+        const unsubscribe = navigation.addListener('focus', () => {
+            loadUserData();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const toggleSidebar = (show: boolean) => {
         if (show) {
@@ -58,13 +65,47 @@ export function ProviderHomeScreen() {
     };
 
     const loadUserData = async () => {
+        setIsRefreshing(true);
         try {
             const data = await AsyncStorage.getItem('user_data');
             if (data) {
-                setUserData(JSON.parse(data));
+                const parsedData = JSON.parse(data);
+                setUserData(parsedData);
+                await fetchInvoiceStats(parsedData.id || parsedData._id);
             }
         } catch (error) {
             console.error('Error loading user data:', error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    const fetchInvoiceStats = async (providerId: string) => {
+        try {
+            // Fetch Invoices
+            const iResponse = await fetch(`${API_BASE_URL}/api/invoices?providerId=${providerId}`);
+            const iResult = await iResponse.json();
+
+            // Fetch Expenses
+            const eResponse = await fetch(`${API_BASE_URL}/api/expenses?providerId=${providerId}`);
+            const eResult = await eResponse.json();
+
+            let totalDebt = 0;
+            let totalPaid = 0;
+
+            if (iResult.success) {
+                totalDebt = iResult.invoices.reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0);
+            }
+
+            if (eResult.success) {
+                totalPaid = eResult.expenses
+                    .filter((exp: any) => exp.paidTo === 'Supplier')
+                    .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
+            }
+
+            setTotalInvoices(totalDebt - totalPaid);
+        } catch (error) {
+            console.error('Fetch Stats Error:', error);
         }
     };
 
@@ -74,9 +115,8 @@ export function ProviderHomeScreen() {
                 <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.greeting}>{t('home.welcome_back')}, {userData?.ownerName || t('common.user')}! 👋</Text>
-                            <Text style={[styles.shopName, { color: theme.text }]} numberOfLines={1}>
-                                {userData?.workshopName || 'Filter Workshop'}
+                            <Text style={[styles.shopName, { color: theme.text, fontSize: 18 }]} numberOfLines={2}>
+                                {t('home.welcome_back')}, {userData?.companyName || userData?.workshopName || 'Filter Workshop'}! 👋
                             </Text>
                         </View>
 
@@ -91,6 +131,19 @@ export function ProviderHomeScreen() {
                                     <MaterialCommunityIcons name="account" size={26} color="#1C1C1E" />
                                 </View>
                             )}
+
+                            <TouchableOpacity
+                                style={[styles.menuIconButton, { marginLeft: 10 }]}
+                                onPress={loadUserData}
+                                activeOpacity={0.7}
+                                disabled={isRefreshing}
+                            >
+                                {isRefreshing ? (
+                                    <ActivityIndicator size="small" color="#F4C430" />
+                                ) : (
+                                    <MaterialCommunityIcons name="refresh" size={26} color={theme.text} />
+                                )}
+                            </TouchableOpacity>
 
                             <TouchableOpacity
                                 style={[styles.menuIconButton, { marginLeft: 10 }]}
@@ -124,9 +177,9 @@ export function ProviderHomeScreen() {
                         <Text style={styles.statLabel}>{t('home.revenue_today')}</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
-                        <MaterialCommunityIcons name="star" size={28} color="#FFB800" />
-                        <Text style={[styles.statNumber, { color: theme.text }]}>4.8</Text>
-                        <Text style={styles.statLabel}>{t('home.rating')}</Text>
+                        <MaterialCommunityIcons name="alert-circle-outline" size={28} color="#FF3B30" />
+                        <Text style={[styles.statNumber, { color: theme.text }]}>{totalInvoices.toFixed(2)}</Text>
+                        <Text style={styles.statLabel}>Outstanding</Text>
                     </View>
                 </View>
 
@@ -268,11 +321,33 @@ export function ProviderHomeScreen() {
                                 style={styles.sidebarLink}
                                 onPress={() => {
                                     toggleSidebar(false);
+                                    navigation.navigate('SettingsTab', { screen: 'AddInvoice' });
+                                }}
+                            >
+                                <MaterialCommunityIcons name="file-document-outline" size={24} color="#F4C430" style={styles.linkIcon} />
+                                <Text style={[styles.linkText, { color: theme.text }]}>Add Invoice</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.sidebarLink}
+                                onPress={() => {
+                                    toggleSidebar(false);
                                     navigation.navigate('SettingsTab', { screen: 'Employees' });
                                 }}
                             >
                                 <MaterialCommunityIcons name="account-multiple-plus-outline" size={24} color="#9C27B0" style={styles.linkIcon} />
                                 <Text style={[styles.linkText, { color: theme.text }]}>Add Employees</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.sidebarLink}
+                                onPress={() => {
+                                    toggleSidebar(false);
+                                    navigation.navigate('SettingsTab', { screen: 'Expenses' });
+                                }}
+                            >
+                                <MaterialCommunityIcons name="cash-multiple" size={24} color="#F44336" style={styles.linkIcon} />
+                                <Text style={[styles.linkText, { color: theme.text }]}>Manage Expenses</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -290,13 +365,30 @@ export function ProviderHomeScreen() {
 
                             <TouchableOpacity
                                 style={styles.sidebarLink}
-                                onPress={() => {
+                                onPress={async () => {
                                     toggleSidebar(false);
-                                    navigation.navigate('SettingsTab');
+                                    try {
+                                        await AsyncStorage.removeItem('user_data');
+                                        // The logic to handle logout (restarting app or navigating to login) 
+                                        // is usually handled by a state change in the root component.
+                                        // For now, we'll assume the app listener handles this or we can use navigation if available.
+                                        Alert.alert('Logout', 'Are you sure?', [
+                                            { text: 'Cancel', style: 'cancel' },
+                                            {
+                                                text: 'Logout', style: 'destructive', onPress: async () => {
+                                                    await AsyncStorage.removeItem('user_data');
+                                                    // If there's an onLogout prop or similar we'd call it.
+                                                    // For now, just a placeholder as most apps use a root state for this.
+                                                }
+                                            }
+                                        ]);
+                                    } catch (e) {
+                                        console.error(e);
+                                    }
                                 }}
                             >
-                                <MaterialCommunityIcons name="cog-outline" size={24} color={theme.subText} style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Settings</Text>
+                                <MaterialCommunityIcons name="logout" size={24} color="#FF3B30" style={styles.linkIcon} />
+                                <Text style={[styles.linkText, { color: '#FF3B30' }]}>Logout</Text>
                             </TouchableOpacity>
                         </ScrollView>
 
