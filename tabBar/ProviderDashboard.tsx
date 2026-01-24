@@ -79,11 +79,9 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                     listeners={({ navigation }) => ({
                         tabPress: (e) => {
                             e.preventDefault();
-                            navigation.reset({
-                                index: 0,
-                                routes: [{ name: 'SettingsHome' }],
+                            navigation.navigate('SettingsTab', {
+                                screen: 'SettingsHome',
                             });
-                            navigation.navigate('SettingsTab');
                         },
                     })}
                 >

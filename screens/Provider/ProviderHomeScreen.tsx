@@ -24,8 +24,9 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import { API_BASE_URL } from '../../constants/api';
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function ProviderHomeScreen() {
     const { theme } = useTheme();
@@ -337,6 +338,17 @@ export function ProviderHomeScreen() {
                             >
                                 <MaterialCommunityIcons name="account-multiple-plus-outline" size={24} color="#9C27B0" style={styles.linkIcon} />
                                 <Text style={[styles.linkText, { color: theme.text }]}>Add Employees</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.sidebarLink}
+                                onPress={() => {
+                                    toggleSidebar(false);
+                                    navigation.navigate('SettingsTab', { screen: 'CorporateCustomers' });
+                                }}
+                            >
+                                <MaterialCommunityIcons name="domain-plus" size={24} color="#2ECC71" style={styles.linkIcon} />
+                                <Text style={[styles.linkText, { color: theme.text }]}>Corporate Customers</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity

@@ -19,8 +19,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import { API_BASE_URL } from '../../constants/api';
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function ProviderOrdersScreen() {
     const { theme } = useTheme();

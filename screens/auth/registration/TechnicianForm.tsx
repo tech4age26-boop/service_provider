@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTranslation } from 'react-i18next';
 import { colors } from '../../../theme/colors';
@@ -38,14 +38,30 @@ export const TechnicianForm = ({ onSubmit, onBack, isLoading }: TechnicianFormPr
     const [showPassword, setShowPassword] = useState(false);
 
     const handlePickImage = async (field: 'logo' | 'frontPhoto' | 'iqamaIdAttach' | 'drivingLicenseAttach') => {
-        const result = await launchImageLibrary({
-            mediaType: 'photo',
-            quality: 0.8,
-            selectionLimit: 1,
-        });
+        try {
+            const result = await launchImageLibrary({
+                mediaType: 'photo',
+                quality: 0.8,
+                selectionLimit: 1,
+            });
 
-        if (result.assets && result.assets[0]?.uri) {
-            setFormData({ ...formData, [field]: result.assets[0].uri });
+            if (result.didCancel) {
+                console.log('User cancelled image picker');
+                return;
+            }
+
+            if (result.errorCode) {
+                console.error('ImagePicker Error: ', result.errorCode, result.errorMessage);
+                Alert.alert('Error', result.errorMessage || 'Failed to select image');
+                return;
+            }
+
+            if (result.assets && result.assets[0]?.uri) {
+                setFormData({ ...formData, [field]: result.assets[0].uri });
+            }
+        } catch (error) {
+            console.error('Image Selection Exception: ', error);
+            Alert.alert('Error', 'An unexpected error occurred while selecting the image.');
         }
     };
 

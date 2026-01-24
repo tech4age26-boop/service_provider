@@ -25,6 +25,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import { API_BASE_URL } from '../../constants/api';
 
 interface Employee {
     _id: string; // From MongoDB
@@ -39,7 +40,7 @@ interface Employee {
     avatar?: string;
 }
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 const EMPLOYEE_ROLES = ['Technician', 'Cashier'];
 const { width } = Dimensions.get('window');

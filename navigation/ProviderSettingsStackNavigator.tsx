@@ -11,6 +11,7 @@ import { SuppliersScreen } from '../screens/Provider/SuppliersScreen';
 
 import { AddInvoiceScreen } from '../screens/Provider/AddInvoiceScreen';
 import { ExpensesScreen } from '../screens/Provider/ExpensesScreen';
+import { CorporateCustomersScreen } from '../screens/Provider/CorporateCustomersScreen';
 
 const Stack = createStackNavigator();
 
@@ -33,6 +34,7 @@ export function ProviderSettingsStackNavigator({ onLogout }: ProviderSettingsSta
             <Stack.Screen name="Suppliers" component={SuppliersScreen} />
             <Stack.Screen name="AddInvoice" component={AddInvoiceScreen} />
             <Stack.Screen name="Expenses" component={ExpensesScreen} />
+            <Stack.Screen name="CorporateCustomers" component={CorporateCustomersScreen} />
             {/* Add other provider specific settings screens here if needed */}
         </Stack.Navigator>
     );

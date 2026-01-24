@@ -22,6 +22,7 @@ import { TechnicianDashboard } from '../../tabBar/TechnicianDashboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { API_BASE_URL } from '../../constants/api';
 
 interface AuthScreenProps {
     onLogin: () => void;
@@ -38,7 +39,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();
 
-    const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
     const handleLogin = async () => {
         if (!phone || !password) {

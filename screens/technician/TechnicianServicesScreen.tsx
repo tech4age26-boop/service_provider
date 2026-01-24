@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../../constants/api';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useTheme } from '../../theme/ThemeContext';
@@ -15,7 +16,7 @@ import { FAB } from '../../components/common/FAB';
 
 import { Service, SheetMode } from '../../types';
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function TechnicianServicesScreen() {
   const { theme } = useTheme();

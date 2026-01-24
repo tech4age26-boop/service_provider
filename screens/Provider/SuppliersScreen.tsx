@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '../../theme/ThemeContext';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../../constants/api';
 
 interface Supplier {
     _id: string;
@@ -15,7 +16,7 @@ interface Supplier {
     status?: string;
 }
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function SuppliersScreen({ navigation }: any) {
     const { theme } = useTheme();

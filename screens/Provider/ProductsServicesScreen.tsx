@@ -24,6 +24,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../../constants/api';
 
 interface Service {
     id: string;
@@ -119,7 +120,7 @@ const CustomAlert = ({ visible, title, message, buttons, onClose, theme }: any) 
     </Modal>
 );
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function ProductsServicesScreen() {
     const { theme } = useTheme();

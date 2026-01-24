@@ -22,7 +22,7 @@ interface RegistrationScreenProps {
     onRegister: () => void;
 }
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+import { API_BASE_URL } from '../../constants/api';
 
 const ProgressIndicator = ({ currentStep }: { currentStep: number }) => {
     return (
@@ -120,9 +120,26 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
                         name: 'front.jpg',
                     } as any);
                 }
+
+                if (formData.vatCertificate) {
+                    data.append('vatCertificate', {
+                        uri: formData.vatCertificate,
+                        type: 'image/jpeg',
+                        name: 'vat.jpg',
+                    } as any);
+                }
+
+                if (formData.crDocument) {
+                    data.append('crDocument', {
+                        uri: formData.crDocument,
+                        type: 'image/jpeg',
+                        name: 'cr.jpg',
+                    } as any);
+                }
             } else {
                 data.append('fullName', formData.fullName);
                 data.append('iqamaId', formData.iqamaId);
+                data.append('drivingLicenseNumber', formData.drivingLicenseNumber);
                 data.append('mobileNumber', formData.mobileNumber);
 
                 if (formData.logo) {
@@ -140,6 +157,22 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
                         name: 'front.jpg',
                     } as any);
                 }
+
+                if (formData.iqamaIdAttach) {
+                    data.append('iqamaIdAttach', {
+                        uri: formData.iqamaIdAttach,
+                        type: 'image/jpeg',
+                        name: 'iqama.jpg',
+                    } as any);
+                }
+
+                if (formData.drivingLicenseAttach) {
+                    data.append('drivingLicenseAttach', {
+                        uri: formData.drivingLicenseAttach,
+                        type: 'image/jpeg',
+                        name: 'license.jpg',
+                    } as any);
+                }
             }
 
             const response = await fetch(`${API_BASE_URL}/api/register`, {
@@ -153,13 +186,9 @@ export function RegistrationScreen({ onBack, onRegister }: RegistrationScreenPro
             const result = await response.json();
 
             if (result.success) {
-                const userData = {
-                    id: result.providerId || result.provider?._id,
-                    type: result.provider?.type,
-                    companyName: result.provider?.workshopName || 'Individual Technician',
-                    ownerName: result.provider?.fullName || result.provider?.workshopName || 'Provider',
-                    logoUrl: result.provider?.logoUrl || null,
-                };
+                const userData = { ...result.provider };
+                if (!userData.id) userData.id = result.providerId || userData._id;
+
                 await AsyncStorage.setItem('user_data', JSON.stringify(userData));
                 Alert.alert('Success', t('registration.success_msg'));
                 onRegister();
