@@ -15,7 +15,38 @@ import { ProviderDashboard } from './tabBar/ProviderDashboard';
 import { CashierPOSScreen } from './screens/Cashier/CashierPOSScreen';
 
 import { ThemeContext, lightTheme, darkTheme, useTheme } from './theme/ThemeContext';
+import { RBACProvider, useRBAC } from './context/RBACContext';
 export { useTheme };
+
+function MainContent({ initializeApp, isAuthenticated, userRole, onLogout }: any) {
+  const { initialize } = useRBAC();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const userData = await AsyncStorage.getItem('user_data');
+      if (userData) {
+        initialize(JSON.parse(userData));
+      }
+    };
+    if (isAuthenticated) {
+      checkAuth();
+    }
+  }, [isAuthenticated]);
+
+  return (
+    <>
+      {!isAuthenticated ? (
+        <AuthScreen onLogin={initializeApp} />
+      ) : userRole === 'workshop' ? (
+        <ProviderDashboard onLogout={onLogout} />
+      ) : userRole === 'cashier' ? ( // Fallback to cashier POS
+        <CashierPOSScreen onLogout={onLogout} />
+      ) : (
+        <TechnicianDashboard onLogout={onLogout} />
+      )}
+    </>
+  );
+}
 
 function App(): React.JSX.Element {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -54,6 +85,11 @@ function App(): React.JSX.Element {
 
   const theme = isDarkMode ? darkTheme : lightTheme;
 
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUserRole(null);
+  };
+
   if (loading || isLanguageSelected === null) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
@@ -64,34 +100,24 @@ function App(): React.JSX.Element {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, isDarkMode }}>
-      <SafeAreaProvider>
-        <StatusBar
-          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-          backgroundColor={theme.background}
-        />
-        {!isLanguageSelected ? (
-          <LanguageScreen onSelect={() => setIsLanguageSelected(true)} />
-        ) : isAuthenticated ? (
-          userRole === 'workshop' ? (
-            <ProviderDashboard onLogout={() => {
-              setIsAuthenticated(false);
-              setUserRole(null);
-            }} />
-          ) : userRole === 'cashier' ? (
-            <CashierPOSScreen onLogout={() => {
-              setIsAuthenticated(false);
-              setUserRole(null);
-            }} />
+      <RBACProvider>
+        <SafeAreaProvider>
+          <StatusBar
+            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+            backgroundColor={theme.background}
+          />
+          {!isLanguageSelected ? (
+            <LanguageScreen onSelect={() => setIsLanguageSelected(true)} />
           ) : (
-            <TechnicianDashboard onLogout={() => {
-              setIsAuthenticated(false);
-              setUserRole(null);
-            }} />
-          )
-        ) : (
-          <AuthScreen onLogin={initializeApp} />
-        )}
-      </SafeAreaProvider>
+            <MainContent
+              initializeApp={initializeApp}
+              isAuthenticated={isAuthenticated}
+              userRole={userRole}
+              onLogout={handleLogout}
+            />
+          )}
+        </SafeAreaProvider>
+      </RBACProvider>
     </ThemeContext.Provider>
   );
 }

@@ -25,6 +25,8 @@ import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
 import { API_BASE_URL } from '../../constants/api';
+import { useRBAC } from '../../context/RBACContext';
+import { Permission } from '../../types/rbac';
 
 
 
@@ -38,6 +40,23 @@ export function ProviderHomeScreen() {
     const [isSidebarVisible, setIsSidebarVisible] = useState(false);
     const sidebarWidth = Dimensions.get('window').width * 0.75;
     const slideAnim = useRef(new Animated.Value(sidebarWidth)).current;
+    const { hasPermission } = useRBAC();
+
+    const SIDEBAR_ITEMS = [
+        { name: 'Wallet', icon: 'wallet-outline', color: '#2196F3', permissions: [Permission.VIEW_CASH_SALES, Permission.VIEW_BANK_SALES], screen: 'PaymentInfo' },
+        { name: 'Our Services', icon: 'tools', color: '#F4C430', permissions: [Permission.CREATE_ORDER, Permission.ACCEPT_ORDER, Permission.VIEW_COMPLETED_ORDERS], screen: 'OurServices' },
+        { name: 'Add Inventory', icon: 'archive-plus-outline', color: '#4CAF50', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Inventory' },
+        { name: 'Add Supplier', icon: 'truck-outline', color: '#00BCD4', permissions: [Permission.SUPPLIER_CRUD], screen: 'Suppliers' },
+        { name: 'Sales Report', icon: 'file-chart-outline', color: '#FF9800', permissions: [Permission.VIEW_DAILY_SALES], screen: null },
+        { name: 'Add Invoice', icon: 'file-document-outline', color: '#F4C430', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'AddInvoice' },
+        { name: 'Add Employees', icon: 'account-multiple-plus-outline', color: '#9C27B0', permissions: [Permission.EMPLOYEE_CRUD], screen: 'Employees' },
+        { name: 'Manage Expenses', icon: 'cash-multiple', color: '#F44336', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Expenses' },
+        { name: 'Manage Categories', icon: 'tag-plus-outline', color: '#E91E63', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Category' },
+    ];
+
+    const filteredSidebarItems = SIDEBAR_ITEMS.filter(item =>
+        item.permissions.some(p => hasPermission(p))
+    );
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
@@ -269,109 +288,21 @@ export function ProviderHomeScreen() {
                         </View>
 
                         <ScrollView style={styles.sidebarLinks}>
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'PaymentInfo' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="wallet-outline" size={24} color="#2196F3" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Wallet</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'OurServices' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="tools" size={24} color="#F4C430" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Our Services</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'Inventory' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="archive-plus-outline" size={24} color="#4CAF50" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Add Inventory</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'Suppliers' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="truck-outline" size={24} color="#00BCD4" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Add Supplier</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.sidebarLink} onPress={() => toggleSidebar(false)}>
-                                <MaterialCommunityIcons name="file-chart-outline" size={24} color="#FF9800" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Sales Report</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'AddInvoice' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="file-document-outline" size={24} color="#F4C430" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Add Invoice</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'Employees' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="account-multiple-plus-outline" size={24} color="#9C27B0" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Add Employees</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'CorporateCustomers' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="domain-plus" size={24} color="#2ECC71" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Corporate Customers</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'Expenses' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="cash-multiple" size={24} color="#F44336" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Manage Expenses</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={styles.sidebarLink}
-                                onPress={() => {
-                                    toggleSidebar(false);
-                                    navigation.navigate('SettingsTab', { screen: 'Category' });
-                                }}
-                            >
-                                <MaterialCommunityIcons name="tag-plus-outline" size={24} color="#E91E63" style={styles.linkIcon} />
-                                <Text style={[styles.linkText, { color: theme.text }]}>Manage Categories</Text>
-                            </TouchableOpacity>
+                            {filteredSidebarItems.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={styles.sidebarLink}
+                                    onPress={() => {
+                                        toggleSidebar(false);
+                                        if (item.screen) {
+                                            navigation.navigate('SettingsTab', { screen: item.screen });
+                                        }
+                                    }}
+                                >
+                                    <MaterialCommunityIcons name={item.icon as any} size={24} color={item.color} style={styles.linkIcon} />
+                                    <Text style={[styles.linkText, { color: theme.text }]}>{item.name}</Text>
+                                </TouchableOpacity>
+                            ))}
 
                             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
@@ -379,24 +310,15 @@ export function ProviderHomeScreen() {
                                 style={styles.sidebarLink}
                                 onPress={async () => {
                                     toggleSidebar(false);
-                                    try {
-                                        await AsyncStorage.removeItem('user_data');
-                                        // The logic to handle logout (restarting app or navigating to login) 
-                                        // is usually handled by a state change in the root component.
-                                        // For now, we'll assume the app listener handles this or we can use navigation if available.
-                                        Alert.alert('Logout', 'Are you sure?', [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Logout', style: 'destructive', onPress: async () => {
-                                                    await AsyncStorage.removeItem('user_data');
-                                                    // If there's an onLogout prop or similar we'd call it.
-                                                    // For now, just a placeholder as most apps use a root state for this.
-                                                }
+                                    Alert.alert('Logout', 'Are you sure?', [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Logout', style: 'destructive', onPress: async () => {
+                                                await AsyncStorage.removeItem('user_data');
+                                                // Add logout logic here if needed
                                             }
-                                        ]);
-                                    } catch (e) {
-                                        console.error(e);
-                                    }
+                                        }
+                                    ]);
                                 }}
                             >
                                 <MaterialCommunityIcons name="logout" size={24} color="#FF3B30" style={styles.linkIcon} />
@@ -625,4 +547,20 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#8E8E93',
     },
+    roleChip: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 15,
+        marginRight: 8,
+    },
+    roleBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 4,
+    },
+    roleBadgeText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    }
 });

@@ -2,10 +2,10 @@
  * API Configuration
  * Centralized base URL for development and production environments.
  */
-const __DEV__ = true;
+const __DEV__ = false;
 
 // LOCAL: Update this with your machine's local IP if testing on a real device
-const DEV_API_URL = 'http://192.168.1.9:5000';
+const DEV_API_URL = 'http://192.168.1.5:5000';
 
 // PRODUCTION: The Vercel deployment URL
 const PROD_API_URL = 'https://filter-server.vercel.app';
