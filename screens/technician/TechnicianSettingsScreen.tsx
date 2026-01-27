@@ -27,7 +27,7 @@ interface TechnicianSettingsScreenProps {
 export function TechnicianSettingsScreen({ onLogout, navigation }: TechnicianSettingsScreenProps) {
     const { theme, toggleTheme, isDarkMode } = useTheme();
     const { t } = useTranslation();
-    const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+
     const [availableToWork, setAvailableToWork] = React.useState(true);
 
     const handleLogout = async () => {
@@ -95,26 +95,7 @@ export function TechnicianSettingsScreen({ onLogout, navigation }: TechnicianSet
                         />
                     )}
                 </View>
-                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
 
-                    {renderSettingItem(
-                        "account-edit",
-                        t('settings.edit_profile'),
-                        () => navigation?.navigate('EditProfile')
-                    )}
-
-                    {renderSettingItem(
-                        "wallet",
-                        t('settings.my_wallet'),
-                        () => navigation?.navigate('PaymentInfo')
-                    )}
-                    {renderSettingItem(
-                        "certificate",
-                        t('settings.my_certifications'),
-                        () => navigation?.navigate('MyCertifications')
-                    )}
-                </View>
 
                 <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
                     <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
@@ -129,17 +110,7 @@ export function TechnicianSettingsScreen({ onLogout, navigation }: TechnicianSet
                             thumbColor={isDarkMode ? '#FFFFFF' : '#f4f3f4'}
                         />
                     )}
-                    {renderSettingItem(
-                        "bell-outline",
-                        t('settings.job_notifications'),
-                        undefined,
-                        <Switch
-                            value={notificationsEnabled}
-                            onValueChange={setNotificationsEnabled}
-                            trackColor={{ false: '#767577', true: '#F4C430' }}
-                            thumbColor={notificationsEnabled ? '#FFFFFF' : '#f4f3f4'}
-                        />
-                    )}
+
                     {renderSettingItem(
                         "translate",
                         t('settings.language_title', 'Language'),
@@ -147,19 +118,7 @@ export function TechnicianSettingsScreen({ onLogout, navigation }: TechnicianSet
                     )}
                 </View>
 
-                <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
-                    <Text style={styles.sectionTitle}>{t('settings.help_support')}</Text>
-                    {renderSettingItem(
-                        "help-circle-outline",
-                        t('settings.help_support'),
-                        () => navigation?.navigate('HelpCenter')
-                    )}
-                    {renderSettingItem(
-                        "file-document-outline",
-                        t('settings.terms_privacy'),
-                        () => navigation?.navigate('TermsPrivacy')
-                    )}
-                </View>
+
 
                 <View style={[styles.card, { backgroundColor: theme.cardBackground, marginBottom: 30 }]}>
                     {renderSettingItem(

@@ -7,11 +7,21 @@ const createOrder = async (req, res) => {
     try {
         const {
             customerId,
-            technicianName, // User selected tech by name | remove providerId
+            customerName,
+            customerPhone,
+            customerVatNo,
+            technicianName,
+            technicianId,
+            providerId,
             vehicleDetails,
             serviceType,
             products,
-            notSure
+            notSure,
+            totalAmount,
+            taxAmount,
+            discountAmount,
+            paymentStatus,
+            orderStatus
         } = req.body;
 
         if (!customerId || !vehicleDetails || !serviceType) {
@@ -28,16 +38,30 @@ const createOrder = async (req, res) => {
         // For general requests without specific provider, skip provider lookup
         const newOrder = {
             customerId: ObjectId.isValid(customerId) ? new ObjectId(customerId) : customerId,
-            providerId: null, // General request - no specific provider
-            workshopName: 'Open Request',
+            customerName: customerName || 'Unknown',
+            customerPhone: customerPhone || '',
+            customerVatNo: customerVatNo || '',
+            providerId: providerId ? (ObjectId.isValid(providerId) ? new ObjectId(providerId) : providerId) : null,
+            workshopName: req.body.workshopName || 'Open Request',
             workshopLogo: null,
             technicianName: technicianName || 'Any Available',
-            technicianId: null,
-            vehicleDetails,
+            technicianId: technicianId ? (ObjectId.isValid(technicianId) ? new ObjectId(technicianId) : technicianId) : null,
+            vehicleDetails: {
+                ...vehicleDetails,
+                plate: vehicleDetails?.plate || '',
+                make: vehicleDetails?.make || 'Unknown',
+                model: vehicleDetails?.model || 'Vehicle',
+                year: vehicleDetails?.year || new Date().getFullYear().toString(),
+                odometerReading: vehicleDetails?.odometerReading || '0'
+            },
             serviceType,
-            products,
-            notSure,
-            status: 'pending',
+            products: products || [],
+            notSure: notSure || false,
+            totalAmount: totalAmount || 0,
+            taxAmount: taxAmount || 0,
+            discountAmount: discountAmount || 0,
+            paymentStatus: paymentStatus || 'pending',
+            status: orderStatus || 'pending',
             createdAt: new Date(),
         };
 
@@ -115,11 +139,14 @@ const getProviderOrders = async (req, res) => {
 
         const orConditions = [];
         if (ObjectId.isValid(providerId)) {
-            orConditions.push({ providerId: new ObjectId(providerId) });
-            orConditions.push({ technicianId: new ObjectId(providerId) });
+            const oId = new ObjectId(providerId);
+            orConditions.push({ providerId: oId });
+            orConditions.push({ technicianId: oId });
+            orConditions.push({ "tasks.technicianId": oId });
         }
         orConditions.push({ providerId: providerId });
         orConditions.push({ technicianId: providerId });
+        orConditions.push({ "tasks.technicianId": providerId });
 
         const query = { $or: orConditions };
 
@@ -204,9 +231,128 @@ const updateOrderStatus = async (req, res) => {
     }
 };
 
+const deleteOrder = async (req, res) => {
+    try {
+        const { orderId } = req.body;
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'orderId is required'
+            });
+        }
+
+        await client.connect();
+        const db = client.db('filter');
+        const ordersCollection = db.collection('orders');
+
+        const result = await ordersCollection.deleteOne({ _id: new ObjectId(orderId) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Order not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Order deleted successfully'
+        });
+
+    } catch (error) {
+        console.error('Delete Order Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error deleting order',
+            error: error.message
+        });
+    }
+};
+
+const updateOrder = async (req, res) => {
+    try {
+        const { orderId, ...updateData } = req.body;
+
+        if (!orderId) {
+            return res.status(400).json({
+                success: false,
+                message: 'orderId is required'
+            });
+        }
+
+        await client.connect();
+        const db = client.db('filter');
+        const ordersCollection = db.collection('orders');
+
+        let updateObj = { ...updateData, updatedAt: new Date() };
+
+        // Handle ID conversions
+        if (updateData.customerId && ObjectId.isValid(updateData.customerId)) updateObj.customerId = new ObjectId(updateData.customerId);
+        if (updateData.providerId && ObjectId.isValid(updateData.providerId)) updateObj.providerId = new ObjectId(updateData.providerId);
+        if (updateData.technicianId && ObjectId.isValid(updateData.technicianId)) updateObj.technicianId = new ObjectId(updateData.technicianId);
+
+        let finalUpdate = { $set: updateObj };
+
+        // If it's a new task addition to existing document
+        if (updateData.isNewTask) {
+            delete updateObj.isNewTask;
+            finalUpdate.$push = {
+                tasks: {
+                    serviceType: updateData.serviceType,
+                    products: updateData.products || [],
+                    technicianName: updateData.technicianName,
+                    technicianId: updateData.technicianId,
+                    status: updateData.status || 'pending',
+                    createdAt: new Date()
+                }
+            };
+            updateObj.status = updateData.status || 'pending';
+        } else if (updateData.taskIndex !== undefined && updateData.taskIndex >= 0) {
+            // Update a specific task in the array
+            const idx = updateData.taskIndex;
+            delete updateObj.taskIndex;
+
+            const nestedUpdate = {};
+            for (let key in updateObj) {
+                if (key !== 'updatedAt') {
+                    nestedUpdate[`tasks.${idx}.${key}`] = updateObj[key];
+                }
+            }
+            // Also update top-level updatedAt
+            nestedUpdate.updatedAt = updateObj.updatedAt;
+
+            // If we are updating task status to completed, 
+            // maybe we should check if all tasks are completed? 
+            // For now, let technician update their own.
+            finalUpdate = { $set: nestedUpdate };
+        }
+
+        const result = await ordersCollection.updateOne(
+            { _id: new ObjectId(orderId) },
+            finalUpdate
+        );
+
+        res.status(200).json({
+            success: true,
+            message: 'Order updated successfully'
+        });
+
+    } catch (error) {
+        console.error('Update Order Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error updating order',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createOrder,
     getCustomerOrders,
     getProviderOrders,
-    updateOrderStatus
+    updateOrderStatus,
+    deleteOrder,
+    updateOrder
 };

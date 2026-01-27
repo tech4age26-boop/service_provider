@@ -17,14 +17,22 @@ import { typography } from '../../theme/typography';
 import { colors } from '../../theme/colors';
 
 interface Task {
-  id: string;
-  service: string;
-  customer: string;
-  location: string;
-  eta?: string;
-  scheduled?: string;
-  status: 'active' | 'next' | 'completed';
+  _id: string;
+  serviceType: string;
+  customerName: string;
+  vehicleDetails: {
+    make: string;
+    model: string;
+    year: string;
+    plate: string;
+  };
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  createdAt: string;
+  technicianId?: string;
+  totalAmount?: number;
 }
+
+const API_BASE_URL = 'https://filter-server.vercel.app';
 
 interface UserData {
   logoUrl?: string;
@@ -43,7 +51,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showBalance, setShowBalance] = useState(false);
+
 
   useEffect(() => {
     loadUserData();
@@ -64,55 +72,60 @@ export function TechnicianHomeScreen({ navigation }: Props) {
     }
   };
 
-  const loadTasks = () => {
-    const demoTasks: Task[] = [
-      {
-        id: '1',
-        service: t('services.brake_service'),
-        customer: 'Ali Khan',
-        location: 'Al Olaya, Riyadh',
-        eta: '15 mins',
-        status: 'active',
-      },
-      {
-        id: '2',
-        service: t('services.battery_replacement'),
-        customer: 'David Wilson',
-        location: 'King Fahd Rd, Riyadh',
-        scheduled: '4:30 PM',
-        status: 'next',
-      },
-      {
-        id: '3',
-        service: t('services.oil_change'),
-        customer: 'Fatima Zahra',
-        location: 'Olaya District',
-        scheduled: 'Yesterday',
-        status: 'completed',
-      },
-      {
-        id: '4',
-        service: t('services.ac_repair'),
-        customer: 'Mohammed Ali',
-        location: 'Riyadh Center',
-        scheduled: 'Yesterday',
-        status: 'completed',
-      },
-    ];
-    setTasks(demoTasks);
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const data = await AsyncStorage.getItem('user_data');
+      if (data) {
+        const user = JSON.parse(data);
+        const userId = user.id || user._id;
+
+        // Fetch orders where technicianId matches current user
+        // We reuse provider-orders endpoint since it checks technicianId too
+        const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${userId}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setTasks(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTaskAction = async (taskId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/update-order-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: taskId, status: newStatus })
+      });
+      const result = await response.json();
+      if (result.success) {
+        loadTasks(); // Refresh list
+      }
+    } catch (error) {
+      console.error('Update status error:', error);
+    }
   };
 
   const renderTask = (task: Task) => {
     let badgeColor = colors.primaryLight;
     let textColor = colors.primary;
-    let statusLabel = t('status.in_transit');
+    let statusLabel: string = task.status;
     let iconName = 'tools';
 
-    if (task.status === 'next') {
-      badgeColor = 'rgba(0, 122, 255, 0.15)';
-      textColor = colors.info;
-      statusLabel = t('status.next_task');
-      iconName = 'calendar-alt';
+    if (task.status === 'pending') {
+      badgeColor = '#FFF9E6';
+      textColor = '#F4C430';
+      statusLabel = 'Pending Acceptance';
+    } else if (task.status === 'in-progress') {
+      badgeColor = '#E1F5FE';
+      textColor = '#03A9F4';
+      statusLabel = 'In Progress';
     } else if (task.status === 'completed') {
       badgeColor = colors.successLight;
       textColor = colors.success;
@@ -121,47 +134,61 @@ export function TechnicianHomeScreen({ navigation }: Props) {
     }
 
     return (
-      <TouchableOpacity
-        key={task.id}
+      <View
+        key={task._id}
         style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate('TaskDetailScreen', { task })}
       >
-        <View style={styles.orderHeader}>
-          <View style={[styles.taskIconContainer, { backgroundColor: badgeColor }]}>
-            <FontAwesome5 name={iconName} size={18} color={textColor} solid />
-          </View>
-          <Text style={[styles.orderTitle, { color: theme.text }]}>
-            {task.service}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: badgeColor }]}>
-            <Text style={[styles.statusText, { color: textColor }]}>
-              {statusLabel}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('TaskDetailScreen', { task })}
+        >
+          <View style={styles.orderHeader}>
+            <View style={[styles.taskIconContainer, { backgroundColor: badgeColor }]}>
+              <FontAwesome5 name={iconName} size={18} color={textColor} solid />
+            </View>
+            <Text style={[styles.orderTitle, { color: theme.text }]}>
+              {task.serviceType}
             </Text>
+            <View style={[styles.statusBadge, { backgroundColor: badgeColor }]}>
+              <Text style={[styles.statusText, { color: textColor }]}>
+                {statusLabel.toUpperCase()}
+              </Text>
+            </View>
           </View>
+          <Text style={[styles.orderCustomer, { color: theme.subText }]}>
+            Customer: {task.customerName}
+          </Text>
+          <Text style={[styles.orderCustomer, { color: theme.subText }]}>
+            Vehicle: {task.vehicleDetails?.plate} ({task.vehicleDetails?.model})
+          </Text>
+        </TouchableOpacity>
+
+        {/* Action Buttons */}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          {task.status === 'pending' && (
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#F4C430' }]}
+              onPress={() => handleTaskAction(task._id, 'in-progress')}
+            >
+              <Text style={styles.actionButtonText}>Accept Job</Text>
+            </TouchableOpacity>
+          )}
+
+          {task.status === 'in-progress' && (
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+              onPress={() => handleTaskAction(task._id, 'completed')}
+            >
+              <Text style={styles.actionButtonText}>Complete Job</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <Text style={[styles.orderCustomer, { color: theme.subText }]}>
-          {t('common.customer')}: {task.customer}
-        </Text>
-        <Text style={[styles.orderCustomer, { color: theme.subText }]}>
-          {t('common.location')}: {task.location}
-        </Text>
-        {task.eta && (
-          <Text style={[styles.orderTime, { color: theme.text }]}>
-            {t('common.eta')}: {task.eta}
-          </Text>
-        )}
-        {task.scheduled && (
-          <Text style={[styles.orderTime, { color: theme.text }]}>
-            {t('common.scheduled')}: {task.scheduled}
-          </Text>
-        )}
-      </TouchableOpacity>
+      </View>
     );
   };
 
-  const activeTasks = tasks.filter((t) => t.status === 'active');
-  const nextTasks = tasks.filter((t) => t.status === 'next');
+  const activeTasks = tasks.filter((t) => t.status === 'in-progress' || t.status === 'pending');
+  // const nextTasks = tasks.filter((t) => t.status === 'next'); // Removed 'next' concept for now
   const completedTasks = tasks.filter((t) => t.status === 'completed');
 
   return (
@@ -203,13 +230,8 @@ export function TechnicianHomeScreen({ navigation }: Props) {
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity
-            style={[styles.walletButton, { backgroundColor: theme.inputBackground }]}
-            onPress={() => navigation.navigate('PaymentInfo')}
-          >
-            <MaterialCommunityIcons name="wallet-outline" size={20} color={theme.text} />
-          </TouchableOpacity>
-          
+
+
           <TouchableOpacity
             style={[styles.notificationIcon, { backgroundColor: theme.inputBackground }]}
             onPress={() => navigation.navigate('Notification')}
@@ -225,25 +247,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
       >
         {/* Enhanced Stats Cards */}
         <View style={styles.statsGrid}>
-          {/* Wallet Balance Card (New) */}
-          <View style={[styles.statCard, { backgroundColor: theme.cardBackground, width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[styles.statIconContainer, { backgroundColor: theme.inputBackground, marginRight: 16, marginBottom: 0 }]}>
-                    <MaterialCommunityIcons name="wallet" size={24} color={colors.primary} />
-                </View>
-                <View>
-                    <Text style={[styles.statLabel, { color: theme.subText, textAlign: 'left' }]}>
-                        {t('home.wallet_balance')}
-                    </Text>
-                    <Text style={[styles.statNumber, { color: theme.text, fontSize: 22 }]}>
-                        {showBalance ? `1,250.00 ${t('wallet.sar')}` : '••••••'}
-                    </Text>
-                </View>
-            </View>
-            <TouchableOpacity onPress={() => setShowBalance(!showBalance)} style={{ padding: 8 }}>
-                <MaterialCommunityIcons name={showBalance ? "eye-off" : "eye"} size={20} color={theme.subText} />
-            </TouchableOpacity>
-          </View>
+
 
           {/* Today's Earnings */}
           <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
@@ -304,17 +308,7 @@ export function TechnicianHomeScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* Next Tasks Section */}
-        {nextTasks.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                {t('status.next_task')}
-              </Text>
-            </View>
-            {nextTasks.map(renderTask)}
-          </View>
-        )}
+
 
         {/* Completed Tasks Section */}
         {completedTasks.length > 0 && (
@@ -484,5 +478,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '600',
     marginTop: 4,
+  },
+  actionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

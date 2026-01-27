@@ -7,7 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { TechnicianNavigation } from '../navigation/technician/technician-navigation';
 import { TechnicianOrderNavigation } from '../navigation/technician/technician-order.navigation';
-import { TechnicianServicesScreen } from '../screens/technician/TechnicianServicesScreen';
+
 import { TechnicianSettingsStack } from '../navigation/technician/TechnicianSettingsStack';
 import { useTheme } from '../App'
 
@@ -72,20 +72,7 @@ function Tabs({ onLogout }: TechnicianDashboardProps) {
         }}
       />
 
-      <Tab.Screen
-        name="Services"
-        component={TechnicianServicesScreen}
-        options={{
-          tabBarLabel: t('products.services'),
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons
-              name="hammer-wrench"
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
+
 
       <Tab.Screen
         name="Settings"

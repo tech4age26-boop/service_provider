@@ -37,6 +37,8 @@ interface Employee {
     commission: string;
     status: 'active' | 'inactive';
     avatar?: string;
+    specialization?: string; // e.g. 'Oil Change'
+    serviceId?: string; // Linked service ID
 }
 
 const API_BASE_URL = 'https://filter-server.vercel.app';
@@ -129,10 +131,13 @@ export function ProviderEmployeesScreen() {
 
 
     // --- State ---
+    const [workshopId, setWorkshopId] = useState('');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]); // Available services for technicians
     const [isLoading, setIsLoading] = useState(true);
-    const [workshopId, setWorkshopId] = useState<string | null>(null);
+    const [isRoleOpen, setIsRoleOpen] = useState(false);
+    const [isServiceOpen, setIsServiceOpen] = useState(false);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -143,7 +148,6 @@ export function ProviderEmployeesScreen() {
 
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [isRoleOpen, setIsRoleOpen] = useState(false);
 
     const initialFormState: Partial<Employee> = {
         name: '',
@@ -154,6 +158,8 @@ export function ProviderEmployeesScreen() {
         commission: '0',
         status: 'active',
         avatar: undefined,
+        specialization: '',
+        serviceId: '',
     };
 
     const [newEmployee, setNewEmployee] = useState<Partial<Employee>>(initialFormState);
@@ -187,6 +193,13 @@ export function ProviderEmployeesScreen() {
                 const expResult = await expResponse.json();
                 if (expResult.success) {
                     setExpenses(expResult.expenses || []);
+                }
+
+                // Fetch Services (Categories) for dropdown
+                const servResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${wId}&type=service`);
+                const servResult = await servResponse.json();
+                if (servResult.success && servResult.categories) {
+                    setServices(servResult.categories);
                 }
             }
         } catch (error) {
@@ -227,6 +240,8 @@ export function ProviderEmployeesScreen() {
         if (!newEmployee.number) missingFields.push('Phone Number');
         if (!newEmployee.employeeType) missingFields.push('Employee Type');
         if (!isEditing && !newEmployee.password) missingFields.push('Password');
+        if (newEmployee.employeeType === 'Technician' && !newEmployee.specialization) missingFields.push('Specialization');
+
 
         // Salary Validation
         if (newEmployee.salary === undefined || newEmployee.salary === '') {
@@ -486,7 +501,7 @@ export function ProviderEmployeesScreen() {
                                     )}
                                     {newEmployee.avatar && (
                                         <TouchableOpacity style={styles.removeAvatarBtn} onPress={removeImage}>
-                                            <MaterialCommunityIcons name="close" size={14} color="#FFF" />
+                                            <MaterialCommunityIcons name="close" size={24} color="#FFF" />
                                         </TouchableOpacity>
                                     )}
                                 </TouchableOpacity>
@@ -534,6 +549,41 @@ export function ProviderEmployeesScreen() {
                                     </View>
                                 )}
                             </View>
+
+                            {/* Service Dropdown (Only for Technicians) */}
+                            {newEmployee.employeeType === 'Technician' && (
+                                <View style={{ marginBottom: 16 }}>
+                                    <FormLabel text="Specialization (Service)" required theme={theme} />
+                                    <TouchableOpacity
+                                        style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                        onPress={() => setIsServiceOpen(!isServiceOpen)}>
+                                        <Text style={{ color: newEmployee.specialization ? theme.text : theme.subText }}>{newEmployee.specialization || 'Select Service'}</Text>
+                                        <MaterialCommunityIcons name={isServiceOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                                    </TouchableOpacity>
+
+                                    {isServiceOpen && (
+                                        <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                                            {services.map((service) => (
+                                                <TouchableOpacity
+                                                    key={service._id}
+                                                    style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                    onPress={() => {
+                                                        setNewEmployee({ ...newEmployee, specialization: service.name, serviceId: service._id });
+                                                        setIsServiceOpen(false);
+                                                    }}>
+                                                    <Text style={{ color: theme.text }}>{service.name}</Text>
+                                                    {newEmployee.serviceId === service._id && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                                </TouchableOpacity>
+                                            ))}
+                                            {services.length === 0 && (
+                                                <View style={{ padding: 10, alignItems: 'center' }}>
+                                                    <Text style={{ color: theme.subText }}>No services found. Add inventory first.</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
+                                </View>
+                            )}
 
                             <View style={{ flexDirection: 'row', gap: 12 }}>
                                 <View style={{ flex: 1 }}>
@@ -605,7 +655,10 @@ export function ProviderEmployeesScreen() {
                                             </TouchableOpacity>
                                         </View>
                                     </View>
-                                    <DetailRow icon="briefcase-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
+                                    <DetailRow icon="badge-account-horizontal-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
+                                    {selectedEmployee.employeeType === 'Technician' && (
+                                        <DetailRow icon="tools" label="Specialization" value={selectedEmployee.specialization} theme={theme} />
+                                    )}
                                     <DetailRow icon="cash" label="Salary" value={`${selectedEmployee.salary} SAR`} theme={theme} />
                                     <DetailRow icon="percent-outline" label="Commission" value={`${selectedEmployee.commission || '0'} %`} theme={theme} />
 

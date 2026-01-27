@@ -50,14 +50,15 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                 }}>
                 <Tab.Screen
                     name="Home"
-                    component={ProviderHomeScreen}
                     options={{
                         tabBarLabel: 'Home',
                         tabBarIcon: ({ color, size }) => (
                             <MaterialCommunityIcons name="home" size={size} color={color} />
                         ),
                     }}
-                />
+                >
+                    {(props) => <ProviderHomeScreen {...props} onLogout={onLogout} />}
+                </Tab.Screen>
                 <Tab.Screen
                     name="Orders"
                     component={ProviderOrdersScreen}

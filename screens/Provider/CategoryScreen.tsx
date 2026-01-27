@@ -71,7 +71,11 @@ export function CategoryScreen({ navigation }: any) {
             const response = await fetch(`${API_BASE_URL}/api/inventory-categories`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ providerId, name: newCatName.trim(), type: catType }),
+                body: JSON.stringify({
+                    providerId,
+                    name: newCatName.trim(),
+                    type: catType,
+                }),
             });
 
             const result = await response.json();
@@ -214,6 +218,8 @@ export function CategoryScreen({ navigation }: any) {
                                 </TouchableOpacity>
                             ))}
                         </View>
+
+
                         <View style={styles.modalButtons}>
                             <TouchableOpacity
                                 style={[styles.modalBtn, { backgroundColor: theme.background }]}

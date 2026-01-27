@@ -33,7 +33,7 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
     const [password, setPassword] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [showRegistration, setShowRegistration] = useState(true);
+    const [showRegistration, setShowRegistration] = useState(false);
     const [dashboardType, setDashboardType] = useState<'provider' | 'technician' | null>(null);
     const insets = useSafeAreaInsets();
     const { t } = useTranslation();

@@ -40,7 +40,7 @@ const createItem = async (req, res) => {
             providerId, name, price, category,
             subCategory, stock, sku,
             duration, serviceTypes, status,
-            uom, purchasePrice
+            uom, purchasePrice, taxPercentage
         } = req.body;
 
         if (!providerId || !name || !price || !['service', 'product'].includes(category)) {
@@ -74,6 +74,7 @@ const createItem = async (req, res) => {
                     : [],
             status: status || 'active',
             images: imageUrls,
+            taxPercentage: parseFloat(taxPercentage || 0),
             createdAt: new Date(),
             updatedAt: new Date()
         };
@@ -179,6 +180,7 @@ const updateItem = async (req, res) => {
         if (updates.purchasePrice) updates.purchasePrice = parseFloat(updates.purchasePrice);
         if (updates.stock) updates.stock = parseInt(updates.stock);
         if (updates.duration) updates.duration = parseInt(updates.duration);
+        if (updates.taxPercentage) updates.taxPercentage = parseFloat(updates.taxPercentage);
 
         if (updates.serviceTypes && typeof updates.serviceTypes === 'string') {
             updates.serviceTypes = JSON.parse(updates.serviceTypes);
@@ -280,9 +282,25 @@ const deleteItem = async (req, res) => {
     }
 };
 
+const getServices = async (req, res) => {
+    try {
+        const { providerId } = req.query;
+        await client.connect();
+        const db = client.db('filter');
+        const items = await db.collection('product_services').find({
+            providerId,
+            category: 'service'
+        }).toArray();
+        res.json({ success: true, data: items });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+};
+
 module.exports = {
     createItem,
     getItems,
+    getServices,
     updateItem,
     deleteItem
 };

@@ -27,7 +27,13 @@ import { useTheme } from '../../theme/ThemeContext';
 
 const API_BASE_URL = 'https://filter-server.vercel.app';
 
-export function ProviderHomeScreen() {
+interface ProviderHomeProps {
+    onLogout?: () => void;
+    navigation?: any;
+    route?: any;
+}
+
+export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
     const { theme } = useTheme();
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
@@ -366,25 +372,24 @@ export function ProviderHomeScreen() {
                             <TouchableOpacity
                                 style={styles.sidebarLink}
                                 onPress={async () => {
-                                    toggleSidebar(false);
-                                    try {
-                                        await AsyncStorage.removeItem('user_data');
-                                        // The logic to handle logout (restarting app or navigating to login) 
-                                        // is usually handled by a state change in the root component.
-                                        // For now, we'll assume the app listener handles this or we can use navigation if available.
-                                        Alert.alert('Logout', 'Are you sure?', [
-                                            { text: 'Cancel', style: 'cancel' },
-                                            {
-                                                text: 'Logout', style: 'destructive', onPress: async () => {
+                                    Alert.alert('Logout', 'Are you sure you want to logout?', [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        {
+                                            text: 'Logout',
+                                            style: 'destructive',
+                                            onPress: async () => {
+                                                toggleSidebar(false);
+                                                try {
                                                     await AsyncStorage.removeItem('user_data');
-                                                    // If there's an onLogout prop or similar we'd call it.
-                                                    // For now, just a placeholder as most apps use a root state for this.
+                                                    if (onLogout) {
+                                                        onLogout();
+                                                    }
+                                                } catch (e) {
+                                                    console.error(e);
                                                 }
                                             }
-                                        ]);
-                                    } catch (e) {
-                                        console.error(e);
-                                    }
+                                        }
+                                    ]);
                                 }}
                             >
                                 <MaterialCommunityIcons name="logout" size={24} color="#FF3B30" style={styles.linkIcon} />

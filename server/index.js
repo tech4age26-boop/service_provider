@@ -43,6 +43,11 @@ app.post('/api/orders', orderController.createOrder);
 app.get('/api/orders', orderController.getCustomerOrders);
 app.get('/api/provider-orders', orderController.getProviderOrders);
 app.put('/api/update-order-status', orderController.updateOrderStatus);
+app.post('/api/delete-order', orderController.deleteOrder);
+app.put('/api/update-order', orderController.updateOrder);
+
+// Services khusus (Filtered from products)
+app.get('/api/services', productServiceController.getServices);
 
 // Product & Service Routes
 app.post('/api/products', uploadProductImages, productServiceController.createItem);

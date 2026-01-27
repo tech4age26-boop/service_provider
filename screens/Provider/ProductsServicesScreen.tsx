@@ -37,6 +37,7 @@ interface Service {
     sku?: string;
     status?: 'active' | 'inactive';
     serviceTypes?: string[];
+    taxPercentage?: string;
 }
 
 const SERVICE_CATEGORIES = ['Diagnostics', 'Quick Service', 'Tuning', 'Detailing', 'Oil Change', 'Tires & Alignment', 'Engine', 'Electrical'];
@@ -152,7 +153,8 @@ export function ProductsServicesScreen() {
         stock: '',
         sku: '',
         status: 'active',
-        serviceTypes: []
+        serviceTypes: [],
+        taxPercentage: '0'
     };
 
     const [newItem, setNewItem] = useState<Partial<Service>>(initialFormState);
@@ -313,10 +315,10 @@ export function ProductsServicesScreen() {
                 formData.append('subCategory', newItem.subCategory!);
                 formData.append('stock', newItem.stock!);
                 formData.append('sku', newItem.sku!);
-            } else {
                 formData.append('duration', newItem.duration!);
                 formData.append('serviceTypes', JSON.stringify(newItem.serviceTypes));
             }
+            formData.append('taxPercentage', newItem.taxPercentage || '0');
 
             // Existing images vs new images logic
             const existingImages: string[] = [];
@@ -582,6 +584,8 @@ export function ProductsServicesScreen() {
                                     )}
                                 </View>
                             </View>
+
+                            <FormInput label="Tax Percentage (%)" value={newItem.taxPercentage} onChangeText={(text: string) => setNewItem({ ...newItem, taxPercentage: text })} placeholder="0" keyboardType="numeric" theme={theme} />
 
                             {newItem.category === 'product' && (
                                 <>

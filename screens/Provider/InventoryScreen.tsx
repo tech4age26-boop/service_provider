@@ -59,11 +59,17 @@ export function InventoryScreen({ navigation }: any) {
         sellingPrice: '',
         stock: '',
         sku: '',
-        category: 'Filters',
+        category: '', // Empty by default
+        connectedService: 'Filters',
         status: 'active' as 'active' | 'inactive',
         unitOfMeasurement: 'Unit',
         taxPercentage: '',
+        serviceId: '', // Empty by default
     });
+    const [actualServices, setActualServices] = useState<any[]>([]);
+
+    // Dropdown States
+    const [openDropdown, setOpenDropdown] = useState<'service' | 'subcategory' | 'unit' | null>(null);
 
     useEffect(() => {
         fetchInventory();
@@ -82,11 +88,21 @@ export function InventoryScreen({ navigation }: any) {
             const userData = JSON.parse(userDataStr);
             const providerId = userData.id || userData._id;
 
-            const response = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=product`);
-            const result = await response.json();
+            // Fetch Product Categories
+            const prodResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=product`);
+            const prodResult = await prodResponse.json();
+            if (prodResult.success) {
+                setCustomCategories(prodResult.categories);
+            }
 
-            if (result.success) {
-                setCustomCategories(result.categories);
+            // Fetch Actual Services (to link products to them)
+            const servResponse = await fetch(`${API_BASE_URL}/api/services?providerId=${providerId}`);
+            const servResult = await servResponse.json();
+
+            if (servResult.success && servResult.data) {
+                setActualServices(servResult.data);
+            } else {
+                setActualServices([]);
             }
         } catch (error) {
             console.error('Fetch Categories Error:', error);
@@ -121,6 +137,11 @@ export function InventoryScreen({ navigation }: any) {
             return;
         }
 
+        if (!formData.serviceId) {
+            Alert.alert('Error', 'Please select a service');
+            return;
+        }
+
         try {
             setIsSaving(true);
             const userDataStr = await AsyncStorage.getItem('user_data');
@@ -139,7 +160,19 @@ export function InventoryScreen({ navigation }: any) {
             if (result.success) {
                 setItems([result.item, ...items]);
                 setShowAddModal(false);
-                setFormData({ name: '', purchasePrice: '', sellingPrice: '', stock: '', sku: '', category: 'Filters', status: 'active', unitOfMeasurement: 'Unit', taxPercentage: '' });
+                setFormData({
+                    name: '',
+                    purchasePrice: '',
+                    sellingPrice: '',
+                    stock: '',
+                    sku: '',
+                    category: '',
+                    serviceId: '',
+                    connectedService: 'Filters',
+                    status: 'active',
+                    unitOfMeasurement: 'Unit',
+                    taxPercentage: ''
+                });
                 // Success alert removed as requested
             } else {
                 Alert.alert('Error', result.message || 'Failed to add product');
@@ -156,6 +189,16 @@ export function InventoryScreen({ navigation }: any) {
         const random = Math.floor(Math.random() * 100000).toString().padStart(6, '0');
         setFormData({ ...formData, sku: `INV-${random}` });
     };
+
+    const DropdownItem = ({ label, isSelected, onPress }: { label: string, isSelected: boolean, onPress: () => void }) => (
+        <TouchableOpacity
+            style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+            onPress={onPress}
+        >
+            <Text style={{ color: theme.text, fontWeight: isSelected ? 'bold' : 'normal' }}>{label}</Text>
+            {isSelected && <MaterialCommunityIcons name="check" size={20} color="#F4C430" />}
+        </TouchableOpacity>
+    );
 
     const handleDeleteItem = async (id: string) => {
         try {
@@ -356,24 +399,58 @@ export function InventoryScreen({ navigation }: any) {
                             </View>
 
                             <View style={styles.formItem}>
-                                <Text style={[styles.label, { color: theme.text }]}>Category</Text>
-                                <View style={styles.categoryRow}>
-                                    {[
-                                        'Filters', 'Brake Pads', 'Fluids', 'Other',
-                                        ...customCategories.map(c => c.name)
-                                    ].map((cat) => (
-                                        <TouchableOpacity
-                                            key={cat}
-                                            style={[
-                                                styles.catChip,
-                                                { borderColor: theme.border, backgroundColor: formData.category === cat ? '#F4C430' : 'transparent' }
-                                            ]}
-                                            onPress={() => setFormData({ ...formData, category: cat })}
-                                        >
-                                            <Text style={[styles.catChipText, { color: formData.category === cat ? '#000' : theme.text }]}>{cat}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <Text style={[styles.label, { color: theme.text }]}>Service it belongs to (Connect to POS) *</Text>
+                                <TouchableOpacity
+                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setOpenDropdown(openDropdown === 'service' ? null : 'service')}
+                                >
+                                    <Text style={{ color: formData.category ? theme.text : theme.subText }}>{formData.category || 'Select Your Service'}</Text>
+                                    <MaterialCommunityIcons name={openDropdown === 'service' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
+                                </TouchableOpacity>
+                                {openDropdown === 'service' && (
+                                    <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                        {actualServices.map((service) => (
+                                            <DropdownItem
+                                                key={service._id}
+                                                label={service.name}
+                                                isSelected={formData.serviceId === service._id}
+                                                onPress={() => {
+                                                    setFormData({ ...formData, category: service.name, serviceId: service._id });
+                                                    setOpenDropdown(null);
+                                                }}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.formItem}>
+                                <Text style={[styles.label, { color: theme.text }]}>Product Sub-Category (Internal)</Text>
+                                <TouchableOpacity
+                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setOpenDropdown(openDropdown === 'subcategory' ? null : 'subcategory')}
+                                >
+                                    <Text style={{ color: theme.text }}>{formData.connectedService || 'Select Sub-Category'}</Text>
+                                    <MaterialCommunityIcons name={openDropdown === 'subcategory' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
+                                </TouchableOpacity>
+                                {openDropdown === 'subcategory' && (
+                                    <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                        {[
+                                            'Filters', 'Brake Pads', 'Fluids', 'Other',
+                                            ...customCategories.map(c => c.name)
+                                        ].map((cat) => (
+                                            <DropdownItem
+                                                key={cat}
+                                                label={cat}
+                                                isSelected={formData.connectedService === cat}
+                                                onPress={() => {
+                                                    setFormData({ ...formData, connectedService: cat });
+                                                    setOpenDropdown(null);
+                                                }}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
                             </View>
 
                             <View style={styles.row}>
@@ -415,20 +492,28 @@ export function InventoryScreen({ navigation }: any) {
 
                             <View style={styles.formItem}>
                                 <Text style={[styles.label, { color: theme.text }]}>Unit of Measurement</Text>
-                                <View style={styles.categoryRow}>
-                                    {['Unit', 'Box', 'Liter', 'Pack', 'Piece'].map((unit) => (
-                                        <TouchableOpacity
-                                            key={unit}
-                                            style={[
-                                                styles.catChip,
-                                                { borderColor: theme.border, backgroundColor: formData.unitOfMeasurement === unit ? '#F4C430' : 'transparent' }
-                                            ]}
-                                            onPress={() => setFormData({ ...formData, unitOfMeasurement: unit })}
-                                        >
-                                            <Text style={[styles.catChipText, { color: formData.unitOfMeasurement === unit ? '#000' : theme.text }]}>{unit}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
+                                <TouchableOpacity
+                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setOpenDropdown(openDropdown === 'unit' ? null : 'unit')}
+                                >
+                                    <Text style={{ color: theme.text }}>{formData.unitOfMeasurement || 'Select Unit'}</Text>
+                                    <MaterialCommunityIcons name={openDropdown === 'unit' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
+                                </TouchableOpacity>
+                                {openDropdown === 'unit' && (
+                                    <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                        {['Unit', 'Box', 'Liter', 'Pack', 'Piece'].map((unit) => (
+                                            <DropdownItem
+                                                key={unit}
+                                                label={unit}
+                                                isSelected={formData.unitOfMeasurement === unit}
+                                                onPress={() => {
+                                                    setFormData({ ...formData, unitOfMeasurement: unit });
+                                                    setOpenDropdown(null);
+                                                }}
+                                            />
+                                        ))}
+                                    </View>
+                                )}
                             </View>
 
                             <View style={styles.formItem}>
@@ -577,20 +662,31 @@ const styles = StyleSheet.create({
     },
     catChipText: { fontSize: 13, fontWeight: '600' },
     skuRow: { flexDirection: 'row', gap: 10 },
-    genBtn: {
+    genBtn: { paddingHorizontal: 15, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    genBtnText: { fontWeight: 'bold' },
+    saveBtn: { paddingVertical: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 },
+    saveBtnText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
+    dropdownSelector: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 15,
         borderRadius: 12,
-        paddingHorizontal: 15,
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderWidth: 1,
     },
-    genBtnText: { fontSize: 13, fontWeight: 'bold' },
-    saveBtn: {
-        paddingVertical: 18,
-        borderRadius: 15,
-        alignItems: 'center',
-        marginTop: 10,
+    dropdownList: {
+        marginTop: 5,
+        borderRadius: 12,
+        borderWidth: 1,
+        overflow: 'hidden',
     },
-    saveBtnText: { fontSize: 16, fontWeight: 'bold', color: '#1C1C1E' },
+    dropdownItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 15,
+        borderBottomWidth: 1,
+    },
     emptyAddBtn: {
         marginTop: 20,
         paddingHorizontal: 25,

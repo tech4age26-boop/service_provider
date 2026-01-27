@@ -15,7 +15,9 @@ const addEmployee = async (req, res) => {
             password,
             salary,
             commission,
-            status
+            status,
+            specialization,
+            serviceId
         } = req.body;
 
         // Validate required fields
@@ -85,6 +87,8 @@ const addEmployee = async (req, res) => {
             salary: salary || '0',
             commission: commission || '0',
             status: status || 'active',
+            specialization: specialization || '',
+            serviceId: serviceId || '',
             createdAt: new Date(),
             updatedAt: new Date()
         };
@@ -161,7 +165,7 @@ const getEmployees = async (req, res) => {
 const updateEmployee = async (req, res) => {
     try {
         const { employeeId } = req.params;
-        const { name, number, employeeType, password, salary, commission, status } = req.body;
+        const { name, number, employeeType, password, salary, commission, status, specialization, serviceId } = req.body;
 
         if (!employeeId) {
             return res.status(400).json({
@@ -195,7 +199,8 @@ const updateEmployee = async (req, res) => {
         if (employeeType) updateData.employeeType = employeeType;
         if (salary !== undefined) updateData.salary = salary;
         if (commission !== undefined) updateData.commission = commission;
-        if (status) updateData.status = status;
+        if (specialization !== undefined) updateData.specialization = specialization;
+        if (serviceId !== undefined) updateData.serviceId = serviceId;
 
         // If password is provided, hash it
         if (password) {

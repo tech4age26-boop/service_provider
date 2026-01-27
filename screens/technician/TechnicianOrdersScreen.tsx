@@ -112,29 +112,34 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
 
             if (result.success) {
                 console.log(`Successfully fetched ${result.data?.length} orders`);
-                const mappedOrders: TechnicianOrder[] = result.data.map((order: any) => {
-                    // Map server status to UI status
-                    let uiStatus = order.status;
-                    let color = '#FF9500'; // Default Orange
+
+                const mapTaskToUI = (order: any, task: any, taskIndex: number) => {
+                    const isSubTask = task !== null;
+                    const displayStatus = isSubTask ? task.status : order.status;
+                    const displayService = isSubTask ? task.serviceType : order.serviceType;
+                    const displayProducts = isSubTask ? (task.products || []) : (order.products || []);
+
+                    let uiStatus = displayStatus;
+                    let color = '#FF9500';
                     let raw: any = 'pending';
 
-                    if (order.status === 'completed') {
+                    if (displayStatus === 'completed') {
                         uiStatus = t('status.completed');
                         color = '#34C759';
                         raw = 'completed';
-                    } else if (order.status === 'in-progress' || order.status === 'active') {
+                    } else if (displayStatus === 'in-progress' || displayStatus === 'active') {
                         uiStatus = t('status.active');
                         color = '#FF9500';
                         raw = 'active';
-                    } else if (order.status === 'pending') {
+                    } else if (displayStatus === 'pending') {
                         uiStatus = t('status.pending');
                         color = '#007AFF';
                         raw = 'next';
                     }
 
                     return {
-                        id: order._id.toString().slice(-6).toUpperCase(),
-                        service: order.serviceType,
+                        id: order._id.toString().slice(-6).toUpperCase() + (isSubTask ? `-${taskIndex + 1}` : ''),
+                        service: displayService,
                         customer: order.customerName || t('common.customer'),
                         phone: order.customerPhone || '',
                         location: order.address || order.location?.address || 'Riyadh',
@@ -143,11 +148,31 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
                         status: uiStatus,
                         rawStatus: raw,
                         statusColor: color,
-                        amount: order.products?.reduce((sum: number, p: any) => sum + (p.price || 0), 0) || '0',
-                        originalOrder: order // Keep full order for navigation
+                        amount: displayProducts.reduce((sum: number, p: any) => sum + ((parseFloat(p.price || p.sellingPrice || 0) || 0) * (p.quantity || 1)), 0).toFixed(2),
+                        originalOrder: order,
+                        taskIndex: taskIndex, // -1 means top level
+                        products: displayProducts
                     };
+                };
+
+                let finalMapped: TechnicianOrder[] = [];
+                result.data.forEach((order: any) => {
+                    // Check top-level technician
+                    if (order.technicianId === providerId || order.technicianId === userData._id) {
+                        finalMapped.push(mapTaskToUI(order, null, -1));
+                    }
+                    // Check tasks array
+                    if (order.tasks && Array.isArray(order.tasks)) {
+                        order.tasks.forEach((t: any, idx: number) => {
+                            if (t.technicianId === providerId || t.technicianId === userData._id) {
+                                finalMapped.push(mapTaskToUI(order, t, idx));
+                            }
+                        });
+                    }
                 });
-                setOrders(mappedOrders);
+
+                // Remove duplicates (if any, though should be unique by context)
+                setOrders(finalMapped);
             } else {
                 console.log('Server returned error:', result.message);
             }
@@ -347,21 +372,7 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
                                             )}
                                         </TouchableOpacity>
                                     )}
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, { backgroundColor: theme.tint + '15' }]}
-                                        onPress={() => handleCall(order.phone!)}
-                                        disabled={!order.phone}
-                                    >
-                                        <MaterialCommunityIcons name="phone" size={18} color={theme.tint} />
-                                        <Text style={[styles.actionButtonText, { color: theme.tint }]}>{t('technician.call_customer')}</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.actionButton, { backgroundColor: '#E3F2FD' }]}
-                                        onPress={() => handleNavigate(order.location!)}
-                                    >
-                                        <MaterialCommunityIcons name="navigation-variant" size={18} color="#1E88E5" />
-                                        <Text style={[styles.actionButtonText, { color: '#1E88E5' }]}>{t('technician.navigate')}</Text>
-                                    </TouchableOpacity>
+
                                 </View>
                             )}
                         </TouchableOpacity>

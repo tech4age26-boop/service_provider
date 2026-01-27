@@ -11,7 +11,7 @@ const getCollection = async () => {
 
 const addInventory = async (req, res) => {
     try {
-        const { providerId, name, purchasePrice, sellingPrice, stock, sku, category, unitOfMeasurement, taxPercentage } = req.body;
+        const { providerId, name, purchasePrice, sellingPrice, stock, sku, category, serviceId, unitOfMeasurement, taxPercentage } = req.body;
 
         if (!providerId || !name || !purchasePrice || !sellingPrice || !stock) {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -26,6 +26,7 @@ const addInventory = async (req, res) => {
             stock: parseInt(stock),
             sku: sku || '',
             category: category || 'General',
+            serviceId: serviceId || '',
             unitOfMeasurement: unitOfMeasurement || 'Unit',
             taxPercentage: taxPercentage !== undefined && taxPercentage !== '' ? parseFloat(taxPercentage) : 0,
             status: 'active',
@@ -43,14 +44,37 @@ const addInventory = async (req, res) => {
 
 const getInventory = async (req, res) => {
     try {
-        const { providerId } = req.query;
+        const { providerId, serviceId, category, page = 1, limit = 20 } = req.query;
         if (!providerId) {
             return res.status(400).json({ success: false, message: 'Provider ID required' });
         }
 
+        const query = { providerId };
+        if (serviceId) query.serviceId = serviceId;
+        if (category) query.category = category;
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const limitVal = parseInt(limit);
+
         const collection = await getCollection();
-        const items = await collection.find({ providerId }).sort({ createdAt: -1 }).toArray();
-        res.status(200).json({ success: true, items });
+
+        const total = await collection.countDocuments(query);
+        const items = await collection.find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitVal)
+            .toArray();
+
+        res.status(200).json({
+            success: true,
+            items,
+            pagination: {
+                total,
+                page: parseInt(page),
+                limit: limitVal,
+                hasMore: (skip + items.length) < total
+            }
+        });
     } catch (error) {
         console.error('Get Inventory Error:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch inventory' });

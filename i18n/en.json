@@ -362,5 +362,32 @@
         "a4": "If you are unable to attend, please cancel the job as early as possible so it can be reassigned. Repeated cancellations may affect your rating.",
         "q5": "How do I update my bank details?",
         "a5": "Go to Settings > Wallet > Payout Methods to add or update your bank information securely."
+    },
+    "pos": {
+        "title": "POS Terminal",
+        "dashboard": "Dashboard",
+        "welcome": "Welcome",
+        "main_services": "Main Services",
+        "no_services": "No services found",
+        "products_selected": "Products Selected",
+        "review_order": "Review Order",
+        "add_to_cart": "Add to Cart",
+        "cart_items": "Cart Items",
+        "proceed_to_tech": "Proceed to Technician",
+        "total_amount": "Total Amount",
+        "discount": "Discount",
+        "subtotal": "Subtotal",
+        "quantity": "Quantity",
+        "add_to_order": "Add to Order",
+        "cancel": "Cancel",
+        "remove": "Remove",
+        "order_review": "Order Review",
+        "items_in_cart": "Items in Cart",
+        "stock": "Stock",
+        "unit": "Unit",
+        "back_to_services": "Back to Services",
+        "success_order": "Order has been proceeded to technician!",
+        "assign_technician": "Assign Technician",
+        "select_tech_for": "Select Technician for"
     }
 }

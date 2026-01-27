@@ -12,7 +12,7 @@ import {
 import { AuthScreen } from './screens/auth/AuthScreen';
 import { TechnicianDashboard } from './tabBar/TechnicianDashboard';
 import { ProviderDashboard } from './tabBar/ProviderDashboard';
-import { CashierPOSScreen } from './screens/Cashier/CashierPOSScreen';
+import { CashierDashboard } from './tabBar/CashierDashboard';
 
 import { ThemeContext, lightTheme, darkTheme, useTheme } from './theme/ThemeContext';
 export { useTheme };
@@ -78,7 +78,7 @@ function App(): React.JSX.Element {
               setUserRole(null);
             }} />
           ) : userRole === 'cashier' ? (
-            <CashierPOSScreen onLogout={() => {
+            <CashierDashboard onLogout={() => {
               setIsAuthenticated(false);
               setUserRole(null);
             }} />
