@@ -26,25 +26,27 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
 import { API_BASE_URL } from '../../constants/api';
+import { useRBAC } from '../../context/RBACContext';
+import { Permission } from '../../types/rbac';
 
 interface Employee {
     _id: string; // From MongoDB
     id?: string; // Legacy/UI
     name: string;
     number: string;
-    employeeType: string;
     password?: string;
     salary: string;
     commission: string;
     status: 'active' | 'inactive';
     avatar?: string;
+    employeeType: 'Technician' | 'Cashier' | 'Staff';
     specialization?: string; // e.g. 'Oil Change'
     serviceId?: string; // Linked service ID
+    permissions?: string[];
 }
 
 
 
-const EMPLOYEE_ROLES = ['Technician', 'Cashier'];
 const { width } = Dimensions.get('window');
 
 // --- Reusable Components ---
@@ -129,6 +131,7 @@ export function ProviderEmployeesScreen() {
     const { theme } = useTheme();
     const { t } = useTranslation();
     const navigation = useNavigation<any>();
+    const { hasPermission, saveEmployeePermissions, getEmployeePermissions } = useRBAC();
 
 
     // --- State ---
@@ -149,11 +152,11 @@ export function ProviderEmployeesScreen() {
 
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [isEditing, setIsEditing] = useState(false);
+    const [selectedPermissions, setSelectedPermissions] = useState<Permission[]>([]);
 
     const initialFormState: Partial<Employee> = {
         name: '',
         number: '',
-        employeeType: '',
         password: '',
         salary: '0',
         commission: '0',
@@ -239,7 +242,6 @@ export function ProviderEmployeesScreen() {
 
         if (!newEmployee.name) missingFields.push('Name');
         if (!newEmployee.number) missingFields.push('Phone Number');
-        if (!newEmployee.employeeType) missingFields.push('Employee Type');
         if (!isEditing && !newEmployee.password) missingFields.push('Password');
         if (newEmployee.employeeType === 'Technician' && !newEmployee.specialization) missingFields.push('Specialization');
 
@@ -284,6 +286,7 @@ export function ProviderEmployeesScreen() {
                 workshopId: workshopId,
                 salary: newEmployee.salary?.toString(),
                 commission: newEmployee.commission?.toString(),
+                permissions: selectedPermissions,
             };
 
             const response = await fetch(endpoint, {
@@ -295,6 +298,12 @@ export function ProviderEmployeesScreen() {
             const result = await response.json();
 
             if (result.success) {
+                // Locally cache permissions for faster UI response OR rely on next load
+                const empId = result.data?._id || newEmployee._id;
+                if (empId) {
+                    saveEmployeePermissions(empId, 'Staff', selectedPermissions);
+                }
+
                 setShowAddModal(false);
                 setNewEmployee(initialFormState);
                 setIsEditing(false);
@@ -314,6 +323,8 @@ export function ProviderEmployeesScreen() {
     const handleEditStart = (employee: Employee) => {
         setNewEmployee({ ...employee });
         setIsEditing(true);
+        // Load permissions from the employee object directly (synced from backend)
+        setSelectedPermissions((employee?.permissions || []) as Permission[]);
         setShowAddModal(true);
     };
 
@@ -363,6 +374,7 @@ export function ProviderEmployeesScreen() {
     const openAddModal = () => {
         setNewEmployee(initialFormState);
         setIsEditing(false);
+        setSelectedPermissions([]);
         setShowAddModal(true);
     };
 
@@ -452,7 +464,7 @@ export function ProviderEmployeesScreen() {
                             </View>
                             <View style={styles.employeeDetails}>
                                 <Text style={[styles.employeeName, { color: theme.text }]} numberOfLines={1}>{employee.name}</Text>
-                                <Text style={styles.employeeRole}>{employee.employeeType}</Text>
+                                <Text style={styles.employeeRole}>{employee.number}</Text>
                             </View>
                         </View>
                         {/* Actions: Phone, WhatsApp, AND 3-Dots */}
@@ -526,29 +538,34 @@ export function ProviderEmployeesScreen() {
 
                             <FormInput label="Account Password" required={!isEditing} value={newEmployee.password} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, password: text })} placeholder={isEditing ? "(Leave blank to keep current)" : "Enter login password"} theme={theme} />
 
-                            {/* Role Dropdown */}
-                            <View style={{ marginBottom: 16 }}>
-                                <FormLabel text="Employee Type" required theme={theme} />
-                                <TouchableOpacity
-                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
-                                    onPress={() => setIsRoleOpen(!isRoleOpen)}>
-                                    <Text style={{ color: newEmployee.employeeType ? theme.text : theme.subText }}>{newEmployee.employeeType || 'Select Role'}</Text>
-                                    <MaterialCommunityIcons name={isRoleOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
-                                </TouchableOpacity>
-
-                                {isRoleOpen && (
-                                    <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                                        {EMPLOYEE_ROLES.map((role) => (
-                                            <TouchableOpacity
-                                                key={role}
-                                                style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
-                                                onPress={() => { setNewEmployee({ ...newEmployee, employeeType: role }); setIsRoleOpen(false); }}>
-                                                <Text style={{ color: theme.text }}>{role}</Text>
-                                                {newEmployee.employeeType === role && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
-                                            </TouchableOpacity>
-                                        ))}
-                                    </View>
-                                )}
+                            {/* Permission Selection Selection (2-Column Grid) */}
+                            <View style={{ marginBottom: 20 }}>
+                                <FormLabel text="Role Permissions" theme={theme} />
+                                <View style={[styles.permissionGrid, { borderColor: theme.border }]}>
+                                    {Object.values(Permission).map((permission) => (
+                                        <TouchableOpacity
+                                            key={permission}
+                                            style={[styles.permissionItem, { borderBottomColor: theme.border, borderRightColor: theme.border }]}
+                                            onPress={() => {
+                                                setSelectedPermissions(prev =>
+                                                    prev.includes(permission)
+                                                        ? prev.filter(p => p !== permission)
+                                                        : [...prev, permission]
+                                                );
+                                            }}
+                                        >
+                                            <MaterialCommunityIcons
+                                                name={selectedPermissions.includes(permission) ? "checkbox-marked" : "checkbox-blank-outline"}
+                                                size={18}
+                                                color={selectedPermissions.includes(permission) ? "#F4C430" : theme.subText}
+                                                style={{ marginRight: 8 }}
+                                            />
+                                            <Text style={{ color: theme.text, fontSize: 11, flex: 1 }} numberOfLines={2}>
+                                                {permission.replace(/_/g, ' ')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
                             </View>
 
                             {/* Service Dropdown (Only for Technicians) */}
@@ -659,6 +676,17 @@ export function ProviderEmployeesScreen() {
                                     <DetailRow icon="badge-account-horizontal-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
                                     {selectedEmployee.employeeType === 'Technician' && (
                                         <DetailRow icon="tools" label="Specialization" value={selectedEmployee.specialization} theme={theme} />
+                                    )}
+
+                                    {selectedEmployee.permissions && selectedEmployee.permissions.length > 0 && (
+                                        <View style={{ padding: 12, borderRadius: 8, backgroundColor: theme.background, marginTop: 10 }}>
+                                            <Text style={{ color: theme.text, fontSize: 12, fontWeight: 'bold', marginBottom: 5 }}>Permissions:</Text>
+                                            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                                                {selectedEmployee.permissions.map(p => (
+                                                    <Text key={p} style={{ color: theme.subText, fontSize: 10, marginRight: 8 }}>• {p.replace(/_/g, ' ')}</Text>
+                                                ))}
+                                            </View>
+                                        </View>
                                     )}
                                     <DetailRow icon="cash" label="Salary" value={`${selectedEmployee.salary} SAR`} theme={theme} />
                                     <DetailRow icon="percent-outline" label="Commission" value={`${selectedEmployee.commission || '0'} %`} theme={theme} />
@@ -819,4 +847,6 @@ const styles = StyleSheet.create({
     customAlertButton: { paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     customAlertButtonText: { fontSize: 16 },
     miniActionBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center' },
+    permissionGrid: { flexDirection: 'row', flexWrap: 'wrap', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
+    permissionItem: { width: '50%', flexDirection: 'row', alignItems: 'center', padding: 10, borderBottomWidth: 1, borderRightWidth: 1 },
 });

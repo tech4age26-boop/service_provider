@@ -207,7 +207,7 @@ export function ProviderSettingsScreen({ onLogout, navigation }: ProviderSetting
             </TouchableOpacity>
 
             <View style={{ height: 40 }} />
-        </ScrollView>
+        </ScrollView >
     );
 }
 

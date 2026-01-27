@@ -1,0 +1,18 @@
+export enum Permission {
+    CREATE_ORDER = 'CREATE_ORDER',
+    ACCEPT_ORDER = 'ACCEPT_ORDER',
+    VIEW_COMPLETED_ORDERS = 'VIEW_COMPLETED_ORDERS',
+    VIEW_DAILY_SALES = 'VIEW_DAILY_SALES',
+    VIEW_CASH_SALES = 'VIEW_CASH_SALES',
+    VIEW_BANK_SALES = 'VIEW_BANK_SALES',
+    PURCHASE_INVOICE_CRUD = 'PURCHASE_INVOICE_CRUD',
+    SUPPLIER_CRUD = 'SUPPLIER_CRUD',
+    CUSTOMER_CRUD = 'CUSTOMER_CRUD',
+    EMPLOYEE_CRUD = 'EMPLOYEE_CRUD',
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    permissions: Permission[];
+}

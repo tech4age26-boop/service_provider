@@ -13,6 +13,8 @@ import { ProductsServicesScreen } from '../screens/Provider/ProductsServicesScre
 import { ProviderSettingsStackNavigator } from '../navigation/ProviderSettingsStackNavigator';
 
 import { useTheme } from '../theme/ThemeContext';
+import { useRBAC } from '../context/RBACContext';
+import { Permission } from '../types/rbac';
 
 const Tab = createBottomTabNavigator();
 
@@ -23,6 +25,9 @@ interface ProviderDashboardProps {
 export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
     const { theme } = useTheme();
     const { t } = useTranslation();
+    const { hasPermission } = useRBAC();
+
+    const showOrders = hasPermission(Permission.ACCEPT_ORDER) || hasPermission(Permission.VIEW_COMPLETED_ORDERS);
 
     return (
         <NavigationContainer>
@@ -59,16 +64,18 @@ export function ProviderDashboard({ onLogout }: ProviderDashboardProps) {
                 >
                     {(props) => <ProviderHomeScreen {...props} onLogout={onLogout} />}
                 </Tab.Screen>
-                <Tab.Screen
-                    name="Orders"
-                    component={ProviderOrdersScreen}
-                    options={{
-                        tabBarLabel: t('orders.title'),
-                        tabBarIcon: ({ color, size }) => (
-                            <MaterialCommunityIcons name="clipboard-list" size={size} color={color} />
-                        ),
-                    }}
-                />
+                {showOrders && (
+                    <Tab.Screen
+                        name="Orders"
+                        component={ProviderOrdersScreen}
+                        options={{
+                            tabBarLabel: t('orders.title'),
+                            tabBarIcon: ({ color, size }) => (
+                                <MaterialCommunityIcons name="clipboard-list" size={size} color={color} />
+                            ),
+                        }}
+                    />
+                )}
                 <Tab.Screen
                     name="SettingsTab"
                     options={{
