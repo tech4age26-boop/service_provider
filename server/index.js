@@ -13,6 +13,12 @@ const supplierController = require('./controllers/SupplierController');
 const inventoryController = require('./controllers/InventoryController');
 const invoiceController = require('./controllers/InvoiceController');
 const expenseController = require('./controllers/ExpenseController');
+const mongoose = require('mongoose');
+
+// MongoDB Connection (Mongoose)
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB Connected (Mongoose)'))
+    .catch(err => console.error('Mongoose Connection Error:', err));
 
 const app = express();
 app.use(cors());
@@ -28,12 +34,18 @@ app.use((req, res, next) => {
 const storage = multer.memoryStorage();
 const uploadRegistration = multer({ storage: storage }).fields([
     { name: 'logo', maxCount: 1 },
-    { name: 'frontPhoto', maxCount: 1 }
+    { name: 'frontPhoto', maxCount: 1 },
+    { name: 'vatCertificate', maxCount: 1 },
+    { name: 'crDocument', maxCount: 1 },
+    { name: 'iqamaIdAttach', maxCount: 1 },
+    { name: 'drivingLicenseAttach', maxCount: 1 }
 ]);
 const uploadProductImages = multer({ storage: storage }).array('images', 4);
 
 app.post('/api/register', uploadRegistration, registrationController.registerProvider);
 app.get('/api/providers', registrationController.getProviders);
+app.get('/api/providers/:id', registrationController.getProvider);
+app.put('/api/providers/:id', uploadRegistration, registrationController.updateProvider);
 app.post('/api/register-customer', customerController.registerCustomer);
 app.post('/api/login', loginController.login);
 app.get('/api/workshops', workshopController.getWorkshops);

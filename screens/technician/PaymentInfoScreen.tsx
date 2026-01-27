@@ -37,32 +37,32 @@ export function PaymentInfoScreen({ navigation }: any) {
     const [isModalVisible, setModalVisible] = useState(false);
     const [editingCardId, setEditingCardId] = useState<string | null>(null);
     const [savedCards, setSavedCards] = useState<Card[]>([
-        { 
-            id: '1', 
-            brand: 'visa', 
-            last4: '4242', 
-            expiry: '12/26', 
-            holder: 'ANAS SALEEM', 
+        {
+            id: '1',
+            brand: 'visa',
+            last4: '4242',
+            expiry: '12/26',
+            holder: 'ANAS SALEEM',
             isDefault: true,
-            color: colors.secondary 
+            color: colors.secondary
         },
-        { 
-            id: '2', 
-            brand: 'mastercard', 
-            last4: '8888', 
-            expiry: '09/25', 
-            holder: 'ANAS SALEEM', 
+        {
+            id: '2',
+            brand: 'mastercard',
+            last4: '8888',
+            expiry: '09/25',
+            holder: 'ANAS SALEEM',
             isDefault: false,
-            color: '#3A3A3A' 
+            color: '#3A3A3A'
         },
-        { 
-            id: '3', 
-            brand: 'mada', 
-            last4: '1234', 
-            expiry: '09/25', 
-            holder: 'ANAS SALEEM', 
+        {
+            id: '3',
+            brand: 'mada',
+            last4: '1234',
+            expiry: '09/25',
+            holder: 'ANAS SALEEM',
             isDefault: false,
-            color: '#3A3A3A' 
+            color: '#3A3A3A'
         },
     ]);
 
@@ -91,10 +91,10 @@ export function PaymentInfoScreen({ navigation }: any) {
 
     const handleSaveCard = () => {
         if (editingCardId) {
-            setSavedCards(savedCards.map(c => 
-                c.id === editingCardId 
-                ? { ...c, holder: cardFormData.name.toUpperCase(), expiry: cardFormData.expiry }
-                : c
+            setSavedCards(savedCards.map(c =>
+                c.id === editingCardId
+                    ? { ...c, holder: cardFormData.name.toUpperCase(), expiry: cardFormData.expiry }
+                    : c
             ));
         } else {
             const card: Card = {
@@ -125,7 +125,7 @@ export function PaymentInfoScreen({ navigation }: any) {
     const CreditCard = ({ card }: { card: Card }) => {
         // Guaranteed valid icon names for the card brand area
         const getIconName = () => {
-            switch(card.brand) {
+            switch (card.brand) {
                 case 'visa': return 'credit-card-chip-outline';
                 case 'mastercard': return 'credit-card-scan-outline';
                 case 'mada': return 'credit-card-wireless-outline';
@@ -138,15 +138,15 @@ export function PaymentInfoScreen({ navigation }: any) {
                 <View style={[styles.cardVisual, { backgroundColor: card.color }]}>
                     <View style={styles.cardHeader}>
                         <View style={styles.cardChip} />
-                        <MaterialCommunityIcons 
-                            name={getIconName()} 
-                            size={42} 
-                            color={colors.primary} 
+                        <MaterialCommunityIcons
+                            name={getIconName()}
+                            size={42}
+                            color={colors.primary}
                         />
                     </View>
-                    
+
                     <Text style={styles.cardNumberText}>••••  ••••  ••••  {card.last4}</Text>
-                    
+
                     <View style={styles.cardFooter}>
                         <View>
                             <Text style={styles.cardLabelText}>{t('wallet.cardholder_name')}</Text>
@@ -165,16 +165,16 @@ export function PaymentInfoScreen({ navigation }: any) {
                         </View>
                     )}
                 </View>
-                
+
                 <View style={styles.cardActions}>
-                    <TouchableOpacity 
-                        style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]} 
+                    <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
                         onPress={() => handleOpenModal(card)}
                     >
                         <MaterialCommunityIcons name="circle-edit-outline" size={18} color={colors.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.actionBtn, { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]} 
+                    <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]}
                         onPress={() => removeCard(card.id)}
                     >
                         <MaterialCommunityIcons name="minus-circle-outline" size={18} color={colors.danger} />
@@ -214,8 +214,8 @@ export function PaymentInfoScreen({ navigation }: any) {
         <AppBody style={{ flex: 1, backgroundColor: theme.background }}>
             <SettingsHeader title={t('settings.payment_info')} />
 
-            <ScrollView 
-                contentContainerStyle={styles.mainContainer} 
+            <ScrollView
+                contentContainerStyle={styles.mainContainer}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Premium gold & black Balance Card */}
@@ -230,7 +230,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                                 <MaterialCommunityIcons name="safe-square-outline" size={30} color={colors.primary} />
                             </View>
                         </View>
-                        
+
                         <View style={styles.statsContainer}>
                             <View style={styles.statItem}>
                                 <Text style={styles.statLabel}>{t('wallet.balance_available')}</Text>
@@ -243,7 +243,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                             </View>
                         </View>
                     </View>
-                    
+
                     <TouchableOpacity style={styles.expressWithdrawBtn}>
                         <Text style={styles.expressWithdrawText}>{t('wallet.request_withdrawal')}</Text>
                         <MaterialCommunityIcons name="chevron-right" size={20} color={colors.secondary} />
@@ -260,9 +260,9 @@ export function PaymentInfoScreen({ navigation }: any) {
                 </View>
 
                 {savedCards.length > 0 ? (
-                    <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false} 
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.horizontalCards}
                         snapToInterval={width * 0.85}
                         decelerationRate="fast"
@@ -285,7 +285,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                         <Text style={styles.seeAllText}>{t('common.view_all')}</Text>
                     </TouchableOpacity>
                 </View>
-                
+
                 <View style={[styles.transactionsList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
                     {transactions.map(item => renderTransaction(item))}
                 </View>
@@ -299,7 +299,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                 onRequestClose={() => setModalVisible(false)}
             >
                 <View style={styles.modalBackdrop}>
-                    <KeyboardAvoidingView 
+                    <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                         style={[styles.modalSheet, { backgroundColor: theme.cardBackground }]}
                     >
@@ -321,7 +321,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                                     placeholder={t('wallet.holder_placeholder')}
                                     placeholderTextColor={theme.subText}
                                     value={cardFormData.name}
-                                    onChangeText={(text) => setCardFormData({...cardFormData, name: text})}
+                                    onChangeText={(text) => setCardFormData({ ...cardFormData, name: text })}
                                     autoCapitalize="characters"
                                 />
                             </View>
@@ -336,7 +336,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                                     maxLength={19}
                                     editable={!editingCardId}
                                     value={cardFormData.number}
-                                    onChangeText={(text) => setCardFormData({...cardFormData, number: text})}
+                                    onChangeText={(text) => setCardFormData({ ...cardFormData, number: text })}
                                 />
                             </View>
 
@@ -349,7 +349,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                                         placeholderTextColor={theme.subText}
                                         maxLength={5}
                                         value={cardFormData.expiry}
-                                        onChangeText={(text) => setCardFormData({...cardFormData, expiry: text})}
+                                        onChangeText={(text) => setCardFormData({ ...cardFormData, expiry: text })}
                                     />
                                 </View>
                                 <View style={[styles.fieldGroup, { flex: 1, marginLeft: 16 }]}>
@@ -363,7 +363,7 @@ export function PaymentInfoScreen({ navigation }: any) {
                                         secureTextEntry
                                         editable={!editingCardId}
                                         value={cardFormData.cvv}
-                                        onChangeText={(text) => setCardFormData({...cardFormData, cvv: text})}
+                                        onChangeText={(text) => setCardFormData({ ...cardFormData, cvv: text })}
                                     />
                                 </View>
                             </View>

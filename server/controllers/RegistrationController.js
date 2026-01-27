@@ -1,6 +1,7 @@
 const cloudinary = require('cloudinary').v2;
-const { MongoClient } = require('mongodb');
+const Provider = require('../models/Provider');
 const bcrypt = require('bcryptjs');
+const mongoose = require('mongoose');
 
 // Cloudinary Config
 cloudinary.config({
@@ -9,8 +10,8 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const uri = process.env.MONGODB_URI;
-const client = new MongoClient(uri);
+// Connection is handled by Mongoose in index.js usually, 
+// but we'll ensure it's established if needed or just use the model.
 
 // Helper to upload buffer to Cloudinary
 const uploadToCloudinary = (buffer) => {
@@ -34,11 +35,9 @@ const registerProvider = async (req, res) => {
         const {
             type, // 'workshop' or 'individual'
             workshopName, ownerName, crNumber, vatNumber,
-            fullName, iqamaId, mobileNumber, password,
+            fullName, iqamaId, mobileNumber, password, email, drivingLicenseNumber,
             services, offersOutdoorServices,
             latitude, longitude, address,
-            logoUrl: bodyLogoUrl,
-            frontPhotoUrl,
         } = req.body;
 
         // Validate required fields based on type
@@ -49,77 +48,33 @@ const registerProvider = async (req, res) => {
             });
         }
 
-        let logoUrl = bodyLogoUrl || null;
-
-        // Connect to Mongo inside the handler for Serverless consistency
-        console.log('Connecting to MongoDB...');
-        try {
-            await client.connect();
-        } catch (dbError) {
-            console.error('MongoDB connection failed:', dbError);
-            return res.status(503).json({
-                success: false,
-                message: 'Database connection failed. Please try again.'
-            });
-        }
-
-        const db = client.db('filter');
-
-        // Define collections
-        const providersCollection = db.collection('register_workshop');
-        const customersCollection = db.collection('customers');
-
-        // Check if phone exists in ANY collection
-        const existingInProviders = await providersCollection.findOne({ mobileNumber });
-        const existingInCustomers = await customersCollection.findOne({ phone: mobileNumber });
-
-        if (existingInProviders || existingInCustomers) {
-            console.log('Registration failed: Phone already registered:', mobileNumber);
-            return res.status(400).json({
-                success: false,
-                message: 'This mobile number is already registered'
-            });
-        }
-
-        if (req.files && req.files['logo']) {
-            console.log('Uploading logo to Cloudinary...');
-            try {
-                const result = await uploadToCloudinary(req.files['logo'][0].buffer);
-                console.log('Logo uploaded:', result.secure_url);
-                logoUrl = result.secure_url;
-            } catch (uploadError) {
-                console.error('Logo upload failed:', uploadError);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Logo upload failed: ' + uploadError.message
-                });
-            }
-        }
-
-        let uploadedFrontPhotoUrl = frontPhotoUrl || null;
-        if (req.files && req.files['frontPhoto']) {
-            console.log('Uploading front photo to Cloudinary...');
-            try {
-                const result = await uploadToCloudinary(req.files['frontPhoto'][0].buffer);
-                console.log('Front photo uploaded:', result.secure_url);
-                uploadedFrontPhotoUrl = result.secure_url;
-            } catch (uploadError) {
-                console.error('Front photo upload failed:', uploadError);
-                return res.status(500).json({
-                    success: false,
-                    message: 'Front photo upload failed: ' + uploadError.message
-                });
-            }
-        }
-
         const providerData = {
-            type: type,
-            services: services ? JSON.parse(services) : [],
-            offersOutdoorServices: offersOutdoorServices === 'true',
+            type,
             mobileNumber,
-            frontPhotoUrl: uploadedFrontPhotoUrl,
+            email: email || null,
+            services: services ? JSON.parse(services) : [],
+            offersOutdoorServices: offersOutdoorServices === 'true' || offersOutdoorServices === 'yes',
             createdAt: new Date()
         };
+
+        const fileFields = type === 'workshop'
+            ? ['logo', 'frontPhoto', 'vatCertificate', 'crDocument']
+            : ['logo', 'frontPhoto', 'iqamaIdAttach', 'drivingLicenseAttach'];
+
+        if (req.files) {
+            for (const field of fileFields) {
+                if (req.files[field]) {
+                    console.log(`Uploading ${field} to Cloudinary...`);
+                    try {
+                        const result = await uploadToCloudinary(req.files[field][0].buffer);
+                        const urlFieldName = field === 'logo' ? 'logoUrl' : `${field}Url`;
+                        providerData[urlFieldName] = result.secure_url;
+                    } catch (uploadError) {
+                        console.error(`${field} upload failed:`, uploadError);
+                    }
+                }
+            }
+        }
 
         if (type === 'workshop') {
             providerData.workshopName = workshopName;
@@ -129,40 +84,44 @@ const registerProvider = async (req, res) => {
         } else {
             providerData.fullName = fullName;
             providerData.iqamaId = iqamaId;
+            providerData.drivingLicenseNumber = drivingLicenseNumber;
         }
 
-        // Shared location and address
         if (latitude && longitude) {
             providerData.location = {
-                type: 'Point',
-                coordinates: [parseFloat(longitude), parseFloat(latitude)]
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude)
             };
         }
         if (address) {
             providerData.address = address;
-        }
-        if (logoUrl) {
-            providerData.logoUrl = logoUrl;
         }
 
         // Password hashing
         const salt = await bcrypt.genSalt(10);
         providerData.password = await bcrypt.hash(password, salt);
 
-        // Insert into the correctly chosen collection
-        console.log(`Inserting into register_workshop...`);
-        const result = await providersCollection.insertOne(providerData);
+        // Check for existing provider
+        const existingProvider = await Provider.findOne({ mobileNumber });
+        if (existingProvider) {
+            return res.status(400).json({
+                success: false,
+                message: 'This mobile number is already registered'
+            });
+        }
 
-        console.log('Provider registered successfully. ID:', result.insertedId);
+        const provider = new Provider(providerData);
+        await provider.save();
+
+        const returnUser = provider.toObject();
+        delete returnUser.password;
+        returnUser.id = provider._id;
 
         res.status(201).json({
             success: true,
             message: `${type.charAt(0).toUpperCase() + type.slice(1)} registered successfully`,
-            providerId: result.insertedId,
-            provider: {
-                _id: result.insertedId,
-                ...providerData
-            }
+            providerId: provider._id,
+            provider: { ...returnUser, id: provider._id }
         });
 
     } catch (error) {
@@ -177,10 +136,7 @@ const registerProvider = async (req, res) => {
 
 const getProviders = async (req, res) => {
     try {
-        await client.connect();
-        const db = client.db('filter');
-
-        const providers = await db.collection('register_workshop').find({}).sort({ createdAt: -1 }).toArray();
+        const providers = await Provider.find({}).sort({ createdAt: -1 });
 
         // Combine and add type-specific naming
         const mappedProviders = providers.map(p => ({
@@ -204,7 +160,94 @@ const getProviders = async (req, res) => {
     }
 };
 
+const getProvider = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const provider = await Provider.findById(id);
+
+        if (!provider) {
+            return res.status(404).json({ success: false, message: 'Provider not found' });
+        }
+
+        const returnUser = provider.toObject();
+        delete returnUser.password;
+        returnUser.id = provider._id;
+
+        res.status(200).json({
+            success: true,
+            provider: returnUser
+        });
+    } catch (error) {
+        console.error('Get Provider Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error' });
+    }
+};
+
+const updateProvider = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        console.log(`Update request for provider ${id}:`, req.body);
+
+        const updateData = { ...req.body };
+        delete updateData.id;
+        delete updateData._id;
+        delete updateData.password; // Don't update password here
+
+        // Handle File Uploads
+        if (req.files) {
+            const fileFields = [
+                'logo',
+                'frontPhoto',
+                'vatCertificate',
+                'crDocument',
+                'iqamaIdAttach',
+                'drivingLicenseAttach'
+            ];
+
+            for (const field of fileFields) {
+                if (req.files[field]) {
+                    console.log(`Uploading ${field} to Cloudinary...`);
+                    try {
+                        const result = await uploadToCloudinary(req.files[field][0].buffer);
+                        // Map field names to URL names
+                        const urlFieldName = field === 'logo' ? 'logoUrl' : `${field}Url`;
+                        updateData[urlFieldName] = result.secure_url;
+                    } catch (error) {
+                        console.error(`Error uploading ${field}:`, error);
+                    }
+                }
+            }
+        }
+
+        const provider = await Provider.findByIdAndUpdate(
+            id,
+            { $set: updateData },
+            { new: true, runValidators: true }
+        );
+
+        if (!provider) {
+            return res.status(404).json({ success: false, message: 'Provider not found' });
+        }
+
+        const returnUser = provider.toObject();
+        delete returnUser.password;
+        returnUser.id = provider._id;
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully',
+            user: returnUser
+        });
+    } catch (error) {
+        console.error('Update Provider Error:', error);
+        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+};
+
 module.exports = {
     registerProvider,
-    getProviders
+    getProviders,
+    getProvider,
+    updateProvider
 };

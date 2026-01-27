@@ -17,8 +17,9 @@ import {
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../theme/ThemeContext';
+import { API_BASE_URL } from '../../constants/api';
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function CategoryScreen({ navigation }: any) {
     const { theme } = useTheme();

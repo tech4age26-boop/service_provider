@@ -24,6 +24,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import { API_BASE_URL } from '../../constants/api';
 
 const { width } = Dimensions.get('window');
 
@@ -41,7 +42,7 @@ interface InventoryItem {
     taxPercentage?: number;
 }
 
-const API_BASE_URL = 'https://filter-server.vercel.app';
+
 
 export function InventoryScreen({ navigation }: any) {
     const { theme } = useTheme();
