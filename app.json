@@ -1,4 +1,16 @@
 {
   "name": "filter",
-  "displayName": "filter"
+  "displayName": "filter",
+  "expo": {
+    "name": "filter",
+    "slug": "filter",
+    "version": "1.0.0",
+    "platforms": [
+      "ios",
+      "android"
+    ],
+    "android": {
+      "package": "com.filter"
+    }
+  }
 }

@@ -13,6 +13,8 @@ const supplierController = require('./controllers/SupplierController');
 const inventoryController = require('./controllers/InventoryController');
 const invoiceController = require('./controllers/InvoiceController');
 const expenseController = require('./controllers/ExpenseController');
+const departmentController = require('./controllers/DepartmentController');
+const salesInvoiceController = require('./controllers/SalesInvoiceController');
 const mongoose = require('mongoose');
 
 // MongoDB Connection (Mongoose)
@@ -58,6 +60,11 @@ app.put('/api/update-order-status', orderController.updateOrderStatus);
 app.post('/api/delete-order', orderController.deleteOrder);
 app.put('/api/update-order', orderController.updateOrder);
 
+// Sales Invoice (save completed order to sales_invoice, then delete order)
+app.post('/api/sales-invoice/save-and-complete', salesInvoiceController.saveSalesInvoiceAndDeleteOrder);
+app.get('/api/sales-invoices', salesInvoiceController.getSalesInvoices);
+app.get('/api/technician-commissions', salesInvoiceController.getTechnicianCommissions);
+
 // Services khusus (Filtered from products)
 app.get('/api/services', productServiceController.getServices);
 
@@ -97,6 +104,11 @@ app.delete('/api/invoices/:id', invoiceController.deleteInvoice);
 app.post('/api/expenses', expenseController.addExpense);
 app.get('/api/expenses', expenseController.getExpenses);
 app.delete('/api/expenses/:id', expenseController.deleteExpense);
+
+// Department Routes
+app.post('/api/departments', departmentController.addDepartment);
+app.get('/api/departments', departmentController.getDepartments);
+app.delete('/api/departments/:id', departmentController.deleteDepartment);
 
 // Health check
 app.get('/', (req, res) => res.send('Filter API is running'));

@@ -51,13 +51,31 @@ export function TechnicianHomeScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [totalCommission, setTotalCommission] = useState<number>(0);
 
   useEffect(() => {
     loadUserData();
     loadTasks();
+    loadCommissions();
     setLoading(false);
   }, []);
+
+  const loadCommissions = async () => {
+    try {
+      const data = await AsyncStorage.getItem('user_data');
+      if (!data) return;
+      const user = JSON.parse(data);
+      const technicianId = user.id || user._id;
+      if (!technicianId) return;
+      const response = await fetch(`${API_BASE_URL}/api/technician-commissions?technicianId=${technicianId}`);
+      const result = await response.json();
+      if (result.success && result.totalEarned != null) {
+        setTotalCommission(result.totalEarned);
+      }
+    } catch (e) {
+      console.error('Load commissions error:', e);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -81,12 +99,12 @@ export function TechnicianHomeScreen({ navigation }: Props) {
         const userId = user.id || user._id;
 
         // Fetch orders where technicianId matches current user
-        // We reuse provider-orders endpoint since it checks technicianId too
-        const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${userId}`);
+        // We reuse provider-orders endpoint which checks technicianId too (if backend supports it)
+        const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${userId}&status=pending,in progress,active,started,arrived,completed`);
         const result = await response.json();
 
         if (result.success) {
-          setTasks(result.data);
+          setTasks(result.orders || result.data || []);
         }
       }
     } catch (error) {
@@ -249,14 +267,16 @@ export function TechnicianHomeScreen({ navigation }: Props) {
         <View style={styles.statsGrid}>
 
 
-          {/* Today's Earnings */}
+          {/* My Commission */}
           <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
             <View style={[styles.statIconContainer, { backgroundColor: colors.successLight }]}>
               <MaterialCommunityIcons name="cash-multiple" size={24} color={colors.success} />
             </View>
-            <Text style={[styles.statNumber, { color: theme.text }]}>1,250</Text>
+            <Text style={[styles.statNumber, { color: theme.text }]}>
+              {typeof totalCommission === 'number' ? totalCommission.toFixed(2) : '0.00'}
+            </Text>
             <Text style={[styles.statLabel, { color: theme.subText }]}>
-              {t('home.earnings_today')} {t('wallet.sar')}
+              {t('home.my_commission') || 'My Commission'} {t('wallet.sar') || 'SAR'}
             </Text>
           </View>
 

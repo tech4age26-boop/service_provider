@@ -13,7 +13,8 @@ import {
     ActivityIndicator,
     Modal,
     KeyboardAvoidingView,
-    Platform
+    Platform,
+    SafeAreaView
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -31,6 +32,9 @@ interface Product {
     price: number;
     sellingPrice: number;
     category: string;
+    subCategory?: string;
+    departmentName?: string;
+    departmentId?: string;
     serviceId?: string; // Linked service ID
     image?: string;
     stock: number;
@@ -56,6 +60,7 @@ interface Technician {
     name: string;
     specialization?: string;
     serviceId?: string;
+    departmentId?: string; // Linked department
     status: 'active' | 'inactive';
 }
 
@@ -107,9 +112,15 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [quantity, setQuantity] = useState('1');
     const [discount, setDiscount] = useState('0');
-    const [viewState, setViewState] = useState<'services' | 'products' | 'cart'>('services');
+    const [isDiscountPercentage, setIsDiscountPercentage] = useState(false);
+    const [viewState, setViewState] = useState<'departments' | 'products' | 'cart'>('departments');
     const [userName, setUserName] = useState('');
     const [isReviewMode, setIsReviewMode] = useState(false);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [selectedDepartment, setSelectedDepartment] = useState<any | null>(null);
+    const [categories, setCategories] = useState<any[]>([]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
 
     // Search State
     const [isSearching, setIsSearching] = useState(false);
@@ -132,16 +143,16 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
     ];
 
     useEffect(() => {
-        fetchData();
-    }, []);
+        const unsubscribe = navigation.addListener('focus', () => {
+            fetchData();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const fetchData = async () => {
         try {
             setIsLoading(true);
             const userDataStr = await AsyncStorage.getItem('user_data');
-
-            let allServices: any[] = [];
-            let allProducts: Product[] = [];
 
             if (userDataStr) {
                 const userData = JSON.parse(userDataStr);
@@ -151,22 +162,29 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 console.log('Fetching POS Data for Provider:', providerId);
 
                 try {
-                    // 1. Fetch Actual Services (Tiles for POS)
-                    const sResponse = await fetch(`${API_BASE_URL}/api/services?providerId=${providerId}`);
-                    const sResult = await sResponse.json();
-
-                    if (sResult.success && sResult.data) {
-                        allServices = sResult.data;
+                    // 1. Fetch Departments (Now the starting point)
+                    const dResponse = await fetch(`${API_BASE_URL}/api/departments?providerId=${providerId}`);
+                    const dResult = await dResponse.json();
+                    if (dResult.success) {
+                        setDepartments(dResult.departments || []);
                     }
 
-                    // 2. Fetch Inventory (Products connected to services)
+                    // 2. Fetch Categories (For product filtering)
+                    const cResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=service`);
+                    const cResult = await cResponse.json();
+                    if (cResult.success) {
+                        setCategories(cResult.categories || []);
+                    }
+
+                    // 3. Fetch Inventory (All Products)
                     const iResponse = await fetch(`${API_BASE_URL}/api/inventory?providerId=${providerId}`);
                     const iResult = await iResponse.json();
                     if (iResult.success && iResult.items) {
-                        allProducts = iResult.items;
+                        setProducts(iResult.items);
+                        setDisplayedProducts(iResult.items);
                     }
 
-                    // 3. Fetch Technicians
+                    // 4. Fetch Technicians
                     const tResponse = await fetch(`${API_BASE_URL}/api/employees?workshopId=${providerId}`);
                     const tResult = await tResponse.json();
                     if (tResult.success && tResult.data) {
@@ -178,25 +196,12 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 }
             }
 
-            // Fallback to dummy data if nothing found (only for products/demo)
-            if (allServices.length === 0 && allProducts.length === 0 && !userDataStr) {
-                console.log('Using DUMMY_PRODUCTS fallback (Demo Mode)');
-                allProducts = DUMMY_PRODUCTS;
-                allServices = Array.from(new Set(DUMMY_PRODUCTS.map((p: any) => p.category))).map(catName => ({
-                    _id: catName.toLowerCase().replace(/\s/g, '_'),
-                    name: catName
-                }));
-            }
-
-            setServices(allServices);
-            setProducts([]); // Initialize empty, will fetch per service
-
             // Fetch Orders
             await fetchOrdersData();
 
         } catch (e) {
             console.error('Fetch Error:', e);
-            setServices([]);
+            setDepartments([]);
             setProducts([]);
         } finally {
             setIsLoading(false);
@@ -264,11 +269,88 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 const result = await response.json();
 
                 if (result.success) {
-                    setOrders(result.data || []);
+                    setOrders(result.orders || result.data || []);
                 }
             }
         } catch (error) {
             console.error('Fetch Orders Error:', error);
+        }
+    };
+
+    const handleDepartmentSelect = async (dept: any) => {
+        setSelectedDepartment(dept);
+        setViewState('products');
+        setIsLoading(true);
+
+        try {
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            const userData = userDataStr ? JSON.parse(userDataStr) : null;
+            const providerId = userData ? (userData.workshopId || userData.id || userData._id) : null;
+
+            // 1. Fetch Services for this department (Filter by departmentId and category=service)
+            // Using /api/products as source of truth for services
+            const sResponse = await fetch(`${API_BASE_URL}/api/products?providerId=${providerId}&category=service&departmentId=${dept._id}`);
+            const sResult = await sResponse.json();
+
+            let fetchedServices = [];
+            if (sResult.success) {
+                fetchedServices = sResult.items || sResult.services || [];
+            }
+
+            // Fallback: If API returns nothing, try to filter from local products if we have them
+            if (fetchedServices.length === 0 && products.length > 0) {
+                // 1. Try direct ID match
+                fetchedServices = products.filter(p => p.category === 'service' && p.departmentId === dept._id);
+
+                // 2. Try Name match if ID failed
+                if (fetchedServices.length === 0) {
+                    fetchedServices = products.filter(p => p.category === 'service' && (p.departmentName === dept.name || p.subCategory === dept.name));
+                }
+
+                // 3. Try matching through categories associated with this department
+                if (fetchedServices.length === 0) {
+                    const deptCats = categories.filter(c => c.departmentId === dept._id).map(c => c.name);
+                    fetchedServices = products.filter(p => p.category === 'service' && deptCats.includes(p.subCategory));
+                }
+            }
+
+            // Filter out any services that are clearly invalid (no name or NaN price)
+            fetchedServices = fetchedServices.filter((s: any) =>
+                s &&
+                s.name &&
+                s.name !== 'NaN' &&
+                (s.price !== undefined || s.sellingPrice !== undefined)
+            );
+
+            setServices(fetchedServices);
+
+            // 2. Filter products by department categories
+            const deptCats = categories.filter(c => c.departmentId === dept._id).map(c => c.name);
+            if (deptCats.length > 0) {
+                setDisplayedProducts(products.filter(p => deptCats.includes(p.category)));
+            } else {
+                setDisplayedProducts(products);
+            }
+        } catch (error) {
+            console.error('Fetch error for department:', error);
+        } finally {
+            setIsLoading(false);
+            setPage(1);
+        }
+    };
+
+    const handleCategoryFilter = (catName: string) => {
+        setSelectedCategory(catName);
+        if (catName === 'All') {
+            // Show all products of current department or all if no department selected
+            if (selectedDepartment) {
+                const deptCats = categories.filter(c => c.departmentId === selectedDepartment._id).map(c => c.name);
+                setDisplayedProducts(deptCats.length > 0 ? products.filter(p => deptCats.includes(p.category)) : products);
+            } else {
+                setDisplayedProducts(products);
+            }
+        } else {
+            setDisplayedProducts(products.filter(p => p.category === catName));
         }
     };
 
@@ -288,42 +370,40 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
         }
     };
 
-    const handleBackToServices = () => {
-        setViewState('services');
-        setSelectedService(null);
+    const handleBackToDepartments = () => {
+        setViewState('departments');
+        setSelectedDepartment(null);
+        setSelectedCategory('All');
     };
 
     const handleNotSure = () => {
-        if (cart.length === 0 && selectedService) {
-            setCart([{
-                _id: 'not-sure-' + Date.now(),
-                name: 'No Product Selected',
-                price: 0,
-                sellingPrice: 0,
-                quantity: 1,
-                discount: 0,
-                isDiscountPercentage: false,
-                taxPercentage: 0,
-                // @ts-ignore
-                isNotSure: true
-            }]);
+        let relevantTechs = technicians;
+
+        // Filter by Active Department first
+        if (selectedDepartment) {
+            relevantTechs = technicians.filter(t =>
+                (t.departmentId === selectedDepartment._id) ||
+                (t.departmentName === selectedDepartment.name) ||
+                (t.specialization === selectedDepartment.name)
+            );
+        } else {
+            // Fallback to cart logic
+            const cartDeptIds = [...new Set(cart.map(item => item.departmentId).filter(Boolean))];
+            const cartCategories = [...new Set(cart.map(item => item.departmentName || item.category).filter(Boolean))];
+
+            if (cartDeptIds.length > 0 || cartCategories.length > 0) {
+                relevantTechs = technicians.filter(t =>
+                    (t.departmentId && cartDeptIds.includes(t.departmentId)) ||
+                    (t.specialization && cartCategories.includes(t.specialization))
+                );
+            }
         }
 
-        let relevantTechs = technicians;
-        if (selectedService) {
-            relevantTechs = technicians.filter(t => t.serviceId === selectedService._id || t.specialization === selectedService.name);
-        }
         setFilteredTechnicians(relevantTechs);
         setShowTechnicianModal(true);
     };
 
     const handleProceed = () => {
-        // Filter technicians based on context
-        // If we are in specific service view, filter by that.
-        // If items are in cart, maybe try to match?
-        // For simplicity, if `selectedService` is set, filter by its ID.
-        // If not, show all.
-
         if (cart.length === 0) {
             Alert.alert(t('error'), t('cart_empty'));
             return;
@@ -331,22 +411,27 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
 
         let relevantTechs = technicians;
 
-        // Priority: selectedService in state -> fallback to cart items
-        // Actually, if we are in 'cart' view, `selectedService` might be null if user navigated back or if added from search.
-        // But if user followed: Service -> Product -> Add, then `selectedService` should be preserved unless explicitly cleared.
-        // Re-checking `handleBackToServices` clears it.
-
-        if (selectedService) {
-            relevantTechs = technicians.filter(t => t.serviceId === selectedService._id || t.specialization === selectedService.name);
-        } else {
-            // Try to guess from cart? Or show all
-            // Ideally show all if no specific context
+        // Filter by Department
+        // 1. If a department is currently selected, filter by that.
+        if (selectedDepartment) {
+            relevantTechs = technicians.filter(t =>
+                (t.departmentId === selectedDepartment._id) ||
+                (t.departmentName === selectedDepartment.name) ||
+                (t.specialization === selectedDepartment.name)
+            );
         }
+        // 2. If no department selected (e.g. from home screen), check cart items' departments
+        else {
+            const cartDeptIds = [...new Set(cart.map(item => item.departmentId).filter(Boolean))];
+            const cartCategories = [...new Set(cart.map(item => item.departmentName || item.category).filter(Boolean))];
 
-        // If no specific techs found for service, maybe show all as fallback? 
-        // User asked "usi service se related". If none, maybe empty list?
-        // Let's fallback to all if filter result is empty to avoid blocking, or show message.
-        // Better: Show filtered. If empty, show message in modal.
+            if (cartDeptIds.length > 0 || cartCategories.length > 0) {
+                relevantTechs = technicians.filter(t =>
+                    (t.departmentId && cartDeptIds.includes(t.departmentId)) ||
+                    (t.specialization && cartCategories.includes(t.specialization))
+                );
+            }
+        }
 
         setFilteredTechnicians(relevantTechs);
         setShowTechnicianModal(true);
@@ -375,6 +460,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 const providerId = userData.workshopId || userData.id || userData._id;
 
                 const totals = calculateOrderTotals();
+                const cartServices = cart.filter(i => i.category === 'service');
 
                 const orderPayload = {
                     customerId: customerInfo.phone || 'walk-in',
@@ -391,7 +477,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                         odometerReading: customerInfo.odometerReading || '0'
                     },
                     customerVatNo: customerInfo.vatNo || '',
-                    serviceType: selectedService ? selectedService.name : 'General Service',
+                    serviceType: cartServices.length > 0 ? cartServices.map(s => s.name).join(', ') : 'General Service',
                     products: cart.map(item => ({
                         productId: item._id,
                         name: item.name,
@@ -399,7 +485,8 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                         sellingPrice: item.sellingPrice || item.price || 0,
                         quantity: item.quantity,
                         discount: item.discount,
-                        total: ((item.sellingPrice || item.price || 0) * item.quantity) - item.discount
+                        total: ((item.sellingPrice || item.price || 0) * item.quantity) - item.discount,
+                        category: item.category
                     })),
                     notSure: false,
                     totalAmount: totals.grandTotal,
@@ -423,7 +510,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                     setShowCustomerModal(false);
                     setShowSidebar(false);
                     setCustomerInfo({ name: '', vatNo: '', phone: '', vehicleNo: '', vehicleMake: '', vehicleModel: '', odometerReading: '' });
-                    setViewState('services');
+                    setViewState('departments');
                     await fetchOrdersData(); // Refresh orders
                 } else {
                     Alert.alert('Error', result.message || 'Failed to place order');
@@ -437,22 +524,50 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
         }
     };
 
-    const handleProductClick = (product: Product) => {
-        // Just add to cart directly with Qty 1
-        const existingItemIndex = cart.findIndex(item => item._id === product._id);
-        if (existingItemIndex > -1) {
-            const newCart = [...cart];
-            newCart[existingItemIndex].quantity += 1;
-            setCart(newCart);
+    const handleItemClick = (item: any) => {
+        const inCart = cart.find(i => i._id === item._id);
+
+        if (inCart) {
+            // Toggle OFF: Remove from cart
+            removeFromCart(item._id);
+            if (selectedProduct?._id === item._id) {
+                setSelectedProduct(null);
+            }
         } else {
+            // Toggle ON: Add to cart
+            // Safely parse price, favoring sellingPrice if available, else price
+            let finalPrice = 0;
+            if (item.sellingPrice !== undefined && item.sellingPrice !== null && !isNaN(parseFloat(item.sellingPrice))) {
+                finalPrice = parseFloat(item.sellingPrice);
+            } else if (item.price !== undefined && item.price !== null && !isNaN(parseFloat(item.price))) {
+                finalPrice = parseFloat(item.price);
+            }
+
             setCart([...cart, {
-                ...product,
+                ...item,
+                price: finalPrice,        // Normalised price
+                sellingPrice: finalPrice, // Normalised sellingPrice
                 quantity: 1,
                 discount: 0,
-                isDiscountPercentage: false, // Default to currency discount
-                taxPercentage: product.taxPercentage || 0
+                isDiscountPercentage: false,
+                taxPercentage: item.taxPercentage || 0
             }]);
+            setSelectedProduct(item); // Optional: just to maybe highlight latest
         }
+    };
+
+    const handleIncrementQty = (id: string) => {
+        setCart(cart.map(item => item._id === id ? { ...item, quantity: item.quantity + 1 } : item));
+    };
+
+    const handleDecrementQty = (id: string) => {
+        setCart(cart.map(item => {
+            if (item._id === id) {
+                const newQty = item.quantity - 1;
+                return newQty >= 1 ? { ...item, quantity: newQty } : item;
+            }
+            return item;
+        }));
     };
 
     const addToCart = () => {
@@ -467,13 +582,25 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
             const newCart = [...cart];
             newCart[existingItemIndex] = {
                 ...newCart[existingItemIndex],
-                quantity: newCart[existingItemIndex].quantity + qty,
-                discount: newCart[existingItemIndex].discount + disc
+                quantity: qty,
+                discount: disc,
+                isDiscountPercentage: isDiscountPercentage,
+                taxPercentage: selectedProduct.taxPercentage || 0
             };
             setCart(newCart);
         } else {
-            setCart([...cart, { ...selectedProduct, quantity: qty, discount: disc }]);
+            setCart([...cart, {
+                ...selectedProduct,
+                quantity: qty,
+                discount: disc,
+                isDiscountPercentage: isDiscountPercentage,
+                taxPercentage: selectedProduct.taxPercentage || 0
+            }]);
         }
+        setSelectedProduct(null);
+        setQuantity('1');
+        setDiscount('0');
+        setIsDiscountPercentage(false);
         setShowSidebar(false);
     };
 
@@ -490,11 +617,11 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
     const handleSearch = (query: string) => {
         setSearchQuery(query);
         if (query.trim() === '') {
-            // Restore previous view or just show nothing specific if empty? 
-            // Better to show nothing or keep current view. 
-            // If empty, maybe just show all products? 
+            // Restore previous view or just show nothing specific if empty?
+            // Better to show nothing or keep current view.
+            // If empty, maybe just show all products?
             // Let's reset filteredProducts to empty if query is empty, OR match all.
-            // Actually, if query is empty, we probably shouldn't show "all" products 
+            // Actually, if query is empty, we probably shouldn't show "all" products
             // until we know what the user wants. But usually search matches on partial text.
 
             // If query is cleared, maybe go back to services if that was the view?
@@ -507,9 +634,9 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
             // Local search on displayed products? OR fetch search?
             // User requested "database sa product search kr kay le kr ayega", so ideally fetch from API.
             // But strict requirement was pagination for services.
-            // For search, real-time fetching might be slow on each char. 
+            // For search, real-time fetching might be slow on each char.
             // Let's stick to local filter of 'products' if we have them, OR fetch if we want true DB search.
-            // Given performace request, maybe just filter displayed? 
+            // Given performace request, maybe just filter displayed?
             // BUT: displayed is only partial.
             // Let's assume search fetches from API if possible, or falls back to 'products' (which we might not have all of anymore).
             // Actually, we replaced 'fetch all' with 'fetch per service'. So we DON'T have all products anymore.
@@ -518,20 +645,20 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
             // Let's try to fetch search results.
 
             // For simplicity and speed in this step, I will filter what is available or trigger a search fetch.
-            // Since we don't have a specific search endpoint setup in standard steps yet, let's assume we filter what we have 
+            // Since we don't have a specific search endpoint setup in standard steps yet, let's assume we filter what we have
             // OR we just set displayedProducts to result of a search fetch.
 
             // To be safe and compliant with "optimistic", let's filter DUMMY if offline, or just show empty.
             // Wait, the user said "database sa product search".
-            // I'll leave search as local for now to avoid breaking changes in this step, 
+            // I'll leave search as local for now to avoid breaking changes in this step,
             // BUT since we don't fetch ALL products anymore, this local search is broken for non-loaded items.
-            // I will implement a basic fetch for search later if needed. 
-            // For now, let's just filter `displayedProducts` to mimic functionality on *visible* items, 
+            // I will implement a basic fetch for search later if needed.
+            // For now, let's just filter `displayedProducts` to mimic functionality on *visible* items,
             // OR better: fetch search results from server (adding search query to API).
 
             // NOTE: The previous code filtered `products`. `products` variable was set in `fetchData`.
             // In my new `fetchData` (which I didn't fully replace yet), it typically fetched ALL.
-            // I should have removed the "Fetch Inventory (Products)" block from `fetchData` 
+            // I should have removed the "Fetch Inventory (Products)" block from `fetchData`
             // because efficient loading means NOT fetching all at start.
             // I will update `fetchData` to NOT fetch products, only categories.
 
@@ -548,7 +675,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 // Restore service filter
                 handleServiceSelect(selectedService);
             } else {
-                setViewState('services');
+                setViewState('departments');
             }
         } else {
             // Opening search
@@ -565,50 +692,35 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
 
 
     const calculateOrderTotals = () => {
-        const servicePrice = selectedService?.price ? parseFloat(selectedService.price as string) : 0;
-        const serviceTaxRate = selectedService?.taxPercentage || 0;
-        const serviceTax = servicePrice * (serviceTaxRate / 100);
-
-        let grossTotal = servicePrice;
+        let grossTotal = 0;
+        let totalTax = 0;
         let totalDiscount = 0;
-        let taxableAmount = servicePrice; // Amount after discount
-        let totalTax = serviceTax;
 
         cart.forEach(item => {
-            const price = item.sellingPrice || item.price || 0;
-            const lineTotal = price * item.quantity;
+            const itemPrice = (item.sellingPrice || item.price || 0) * item.quantity;
+            const itemDiscount = item.isDiscountPercentage ? (itemPrice * (item.discount / 100)) : item.discount;
+            const taxableAmount = itemPrice - itemDiscount;
+            const itemTax = taxableAmount * ((item.taxPercentage || 0) / 100);
 
-            // Calculate item discount
-            let itemDiscount = 0;
-            if (item.isDiscountPercentage) {
-                itemDiscount = lineTotal * (item.discount / 100);
-            } else {
-                itemDiscount = item.discount;
-            }
-
-            const lineNet = Math.max(0, lineTotal - itemDiscount);
-
-            grossTotal += lineTotal;
+            grossTotal += itemPrice;
             totalDiscount += itemDiscount;
-            taxableAmount += lineNet;
-
-            // Calculate Tax on Net Amount
-            const taxRate = item.taxPercentage || 0;
-            const itemTax = lineNet * (taxRate / 100);
             totalTax += itemTax;
         });
 
         return {
-            servicePrice,
-            serviceTax,
             grossTotal,
-            totalDiscount,
             totalTax,
-            grandTotal: taxableAmount + totalTax
+            totalDiscount,
+            grandTotal: (grossTotal - totalDiscount + totalTax)
         };
     };
 
     const totals = calculateOrderTotals();
+
+    // Derived Stats
+    const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'ready' || o.status === 'assigned').length;
+    const inProgressOrders = orders.filter(o => o.status === 'in progress' || o.status === 'in-progress' || o.status === 'active' || o.status === 'processing' || o.status === 'started' || o.status === 'arrived').length;
+    const completedOrders = orders.filter(o => o.status === 'completed' || o.status === 'delivered').length;
 
     const StatsGrid = () => (
         <View style={styles.statsGrid}>
@@ -653,33 +765,31 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                     <MaterialCommunityIcons name="format-list-bulleted" size={24} color="#9C27B0" />
                 </View>
                 <View>
-                    <Text style={[styles.statValue, { color: theme.text }]}>{services.length}</Text>
-                    <Text style={[styles.statLabel, { color: theme.subText }]}>Total Services</Text>
+                    <Text style={[styles.statValue, { color: theme.text }]}>{departments.length}</Text>
+                    <Text style={[styles.statLabel, { color: theme.subText }]}>Total services</Text>
                 </View>
             </View>
         </View>
     );
 
-    const pendingOrders = orders.filter(o => o.status === 'pending').length;
-    const inProgressOrders = orders.filter(o => o.status === 'in-progress').length;
-    const completedOrders = orders.filter(o => o.status === 'completed').length;
+
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <SafeAreaView style={[styles.rootContainer, { backgroundColor: theme.background }]}>
             {/* Header */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground, borderBottomColor: theme.border }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {(viewState === 'products' || viewState === 'cart') && (
-                        <TouchableOpacity onPress={handleBackToServices} style={{ marginRight: 10 }}>
+                        <TouchableOpacity onPress={handleBackToDepartments} style={{ marginRight: 10 }}>
                             <MaterialCommunityIcons name="arrow-left" size={24} color={theme.text} />
                         </TouchableOpacity>
                     )}
                     <View>
                         <Text style={[styles.headerTitle, { color: theme.text }]}>{t('pos.welcome')}, {userName}</Text>
                         <Text style={{ color: theme.subText, fontSize: 12 }}>
-                            {viewState === 'services' ? `${t('pos.title')} • ${t('pos.dashboard')}` :
+                            {viewState === 'departments' ? t('pos.dashboard') :
                                 viewState === 'cart' ? t('pos.order_review') :
-                                    `${t('pos.title')} • ${selectedService?.name}`}
+                                    selectedDepartment?.name || 'Products'}
                         </Text>
                     </View>
                 </View>
@@ -687,10 +797,10 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     {/* Search Field / Icon */}
                     {isSearching ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBackground, borderRadius: 8, paddingHorizontal: 10, height: 40, width: 200 }}>
-                            <MaterialCommunityIcons name="magnify" size={20} color={theme.subText} />
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: theme.inputBackground, borderRadius: 10, paddingHorizontal: 12, height: 38, width: 220 }}>
+                            <MaterialCommunityIcons name="magnify" size={18} color={theme.subText} />
                             <TextInput
-                                style={{ flex: 1, color: theme.text, marginLeft: 5, paddingVertical: 0 }}
+                                style={{ flex: 1, color: theme.text, marginLeft: 8, paddingVertical: 0, fontSize: 13 }}
                                 placeholder={t('common.search')}
                                 placeholderTextColor={theme.subText}
                                 value={searchQuery}
@@ -698,13 +808,13 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                                 autoFocus
                             />
                             <TouchableOpacity onPress={toggleSearch}>
-                                <MaterialCommunityIcons name="close" size={20} color={theme.subText} />
+                                <MaterialCommunityIcons name="close" size={18} color={theme.subText} />
                             </TouchableOpacity>
                         </View>
                     ) : (
                         <TouchableOpacity
                             onPress={toggleSearch}
-                            style={[styles.logoutBtn, { backgroundColor: theme.inputBackground, marginRight: 0 }]}
+                            style={[styles.headerActionBtn, { backgroundColor: theme.inputBackground }]}
                         >
                             <MaterialCommunityIcons name="magnify" size={20} color={theme.text} />
                         </TouchableOpacity>
@@ -712,7 +822,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
 
                     <TouchableOpacity
                         onPress={toggleTheme}
-                        style={[styles.logoutBtn, { backgroundColor: theme.inputBackground, marginRight: 0 }]}
+                        style={[styles.headerActionBtn, { backgroundColor: theme.inputBackground }]}
                     >
                         <MaterialCommunityIcons
                             name={isDarkMode ? "weather-sunny" : "weather-night"}
@@ -721,15 +831,24 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                         />
                     </TouchableOpacity>
 
+                    {viewState === 'products' && (
+                        <TouchableOpacity
+                            onPress={() => setShowCategoryModal(true)}
+                            style={[styles.headerActionBtn, { backgroundColor: '#F4C430' }]}
+                        >
+                            <MaterialCommunityIcons name="filter-variant" size={20} color="#1C1C1E" />
+                        </TouchableOpacity>
+                    )}
+
                     <TouchableOpacity
                         onPress={toggleLanguage}
-                        style={[styles.logoutBtn, { backgroundColor: theme.inputBackground, marginRight: 0 }]}
+                        style={[styles.headerActionBtn, { backgroundColor: theme.inputBackground }]}
                     >
                         <Text style={{ color: theme.text, fontSize: 12, fontWeight: 'bold' }}>
                             {i18n.language === 'en' ? 'AR' : 'EN'}
                         </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={onLogout} style={styles.logoutBtn}>
+                    <TouchableOpacity onPress={onLogout} style={[styles.headerActionBtn, { backgroundColor: 'rgba(255,59,48,0.1)' }]}>
                         <MaterialCommunityIcons name="logout" size={20} color="#FF3B30" />
                     </TouchableOpacity>
                 </View>
@@ -738,34 +857,34 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
             <ScrollView style={{ flex: 1, padding: 15 }} showsVerticalScrollIndicator={false}>
 
 
-                {viewState === 'services' && (
+                {viewState === 'departments' && (
                     <>
                         <StatsGrid />
-                        <Text style={[styles.sectionTitle, { color: theme.text, marginVertical: 15 }]}>{t('pos.main_services')}</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginVertical: 15 }]}>Main Departments</Text>
                         <View style={styles.servicesGrid}>
                             {isLoading ? (
                                 <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 50 }}>
                                     <ActivityIndicator size="large" color="#F4C430" />
                                 </View>
-                            ) : services.length === 0 ? (
+                            ) : departments.length === 0 ? (
                                 <View style={styles.center}>
-                                    <MaterialCommunityIcons name="store-remove" size={50} color={theme.subText} />
-                                    <Text style={{ color: theme.subText, marginTop: 10 }}>{t('pos.no_services')}</Text>
+                                    <MaterialCommunityIcons name="office-building-marker" size={50} color={theme.subText} />
+                                    <Text style={{ color: theme.subText, marginTop: 10 }}>No departments found</Text>
                                 </View>
                             ) : (
-                                services.map((service) => (
+                                departments.map((dept) => (
                                     <TouchableOpacity
-                                        key={service._id}
+                                        key={dept._id}
                                         style={[styles.serviceCard, { backgroundColor: theme.cardBackground }]}
-                                        onPress={() => handleServiceSelect(service)}
+                                        onPress={() => handleDepartmentSelect(dept)}
                                         activeOpacity={0.8}
                                     >
                                         <View style={[styles.serviceIconCircle, { backgroundColor: '#F4C430' }]}>
-                                            <MaterialCommunityIcons name={service.name?.toLowerCase().includes('wash') ? 'car-wash' : 'car-cog'} size={32} color="#1C1C1E" />
+                                            <MaterialCommunityIcons name="office-building" size={32} color="#1C1C1E" />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[styles.serviceCardTitle, { color: theme.text }]}>{service.name}</Text>
-                                            <Text style={{ color: theme.tint, fontWeight: 'bold', fontSize: 12 }}>{service.price || 0} SAR</Text>
+                                            <Text style={[styles.serviceCardTitle, { color: theme.text }]}>{dept.name}</Text>
+                                            <Text style={{ color: theme.subText, fontSize: 12 }}>Select to view products</Text>
                                         </View>
                                         <View style={styles.serviceArrow}>
                                             <MaterialCommunityIcons name="chevron-right" size={20} color="#FFFFFF" />
@@ -774,94 +893,111 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                                 ))
                             )}
                         </View>
-
-
                     </>
                 )}
 
                 {viewState === 'products' && (
-                    <View style={styles.productsGrid}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 15 }}>
-                            <Text style={[styles.sectionTitle, { color: theme.text }]}>{selectedService?.name} {t('pos.products_selected')}</Text>
-
-                        </View>
-
-                        {
-                            isLoading ? (
-                                <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center', paddingVertical: 100 }}>
-                                    <ActivityIndicator size="large" color="#F4C430" />
+                    <View style={{ marginBottom: 150 }}>
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 15 }]}>Products</Text>
+                        <View style={styles.productsGrid}>
+                            {/* Not Sure / Skip Card */}
+                            <TouchableOpacity
+                                style={[styles.productCard, { backgroundColor: theme.cardBackground, borderStyle: 'dashed', borderWidth: 2, borderColor: '#F4C430' }]}
+                                onPress={handleNotSure}
+                            >
+                                <View style={[styles.productImagePlaceholder, { backgroundColor: theme.inputBackground }]}>
+                                    <MaterialCommunityIcons name="help-circle-outline" size={40} color="#F4C430" />
                                 </View>
-                            ) : (
-                                <>
-                                    {/* Not Sure / Skip Card */}
+                                <View style={{ padding: 12 }}>
+                                    <Text style={[styles.productName, { color: theme.text, textAlign: 'center' }]}>Not Sure / Skip Product</Text>
+                                    <Text style={{ color: theme.subText, fontSize: 10, textAlign: 'center' }}>Technician will decide</Text>
+                                </View>
+                            </TouchableOpacity>
+
+                            {displayedProducts.map((product) => {
+                                const inCart = cart.find(item => item._id === product._id);
+                                const isSelected = selectedProduct?._id === product._id;
+                                return (
                                     <TouchableOpacity
-                                        style={[styles.productCard, { backgroundColor: theme.cardBackground, borderStyle: 'dashed', borderWidth: 2, borderColor: '#F4C430' }]}
-                                        onPress={handleNotSure}
+                                        key={product._id}
+                                        style={[
+                                            styles.productCard,
+                                            {
+                                                backgroundColor: theme.cardBackground,
+                                                borderWidth: inCart ? 2 : 1,
+                                                borderColor: inCart ? '#F4C430' : 'rgba(0,0,0,0.05)',
+                                                elevation: inCart ? 15 : 5,
+                                                shadowColor: inCart ? '#F4C430' : '#000',
+                                            }
+                                        ]}
+                                        onPress={() => handleItemClick(product)}
                                     >
                                         <View style={[styles.productImagePlaceholder, { backgroundColor: theme.inputBackground }]}>
-                                            <MaterialCommunityIcons name="help-circle-outline" size={40} color="#F4C430" />
+                                            <MaterialCommunityIcons name="package-variant-closed" size={32} color="#F4C430" />
+                                            {inCart && (
+                                                <View style={styles.qtyBadge}>
+                                                    <Text style={styles.qtyBadgeText}>{inCart.quantity}</Text>
+                                                </View>
+                                            )}
                                         </View>
-                                        <View style={{ padding: 12 }}>
-                                            <Text style={[styles.productName, { color: theme.text, textAlign: 'center' }]}>Not Sure / Skip Product</Text>
-                                            <Text style={{ color: theme.subText, fontSize: 10, textAlign: 'center' }}>Technician will decide</Text>
+                                        <View style={{ padding: 14 }}>
+                                            <Text style={[styles.productName, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
+                                            <Text style={[styles.productPrice]}>{(product.sellingPrice || product.price || 0).toFixed(2)} SAR</Text>
+                                            {inCart && (
+                                                <View style={[styles.qtyActionRow, { marginTop: 8 }]}>
+                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); setQuantity(Math.max(1, inCart.quantity - 1).toString()); updateCartItem(product._id, { quantity: Math.max(1, inCart.quantity - 1) }); }} style={styles.qtyActionBtn}>
+                                                        <MaterialCommunityIcons name="minus" size={16} color="#1C1C1E" />
+                                                    </TouchableOpacity>
+                                                    <Text style={[styles.qtyActionText, { color: theme.text }]}>{inCart.quantity}</Text>
+                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation(); setQuantity((inCart.quantity + 1).toString()); updateCartItem(product._id, { quantity: inCart.quantity + 1 }); }} style={styles.qtyActionBtn}>
+                                                        <MaterialCommunityIcons name="plus" size={16} color="#1C1C1E" />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            )}
                                         </View>
                                     </TouchableOpacity>
+                                )
+                            })}
+                        </View>
 
-                                    {displayedProducts.map((product) => {
-                                        const inCart = cart.find(item => item._id === product._id);
-                                        return (
-                                            <TouchableOpacity
-                                                key={product._id}
-                                                style={[styles.productCard, { backgroundColor: theme.cardBackground, borderColor: inCart ? '#F4C430' : 'transparent', borderWidth: 2 }]}
-                                                onPress={() => handleProductClick(product)}
-                                            >
-                                                <View style={[styles.productImagePlaceholder, { backgroundColor: theme.inputBackground }]}>
-                                                    <MaterialCommunityIcons name="tag-outline" size={40} color="#F4C430" />
-                                                    {inCart && (
-                                                        <View style={styles.qtyBadge}>
-                                                            <Text style={styles.qtyBadgeText}>{inCart.quantity}</Text>
-                                                        </View>
-                                                    )}
+                        <Text style={[styles.sectionTitle, { color: theme.text, marginVertical: 15 }]}>Services</Text>
+                        <View style={styles.productsGrid}>
+                            {services.map((service) => {
+                                const inCart = cart.find(item => item._id === service._id);
+                                const isSelected = selectedProduct?._id === service._id;
+                                return (
+                                    <TouchableOpacity
+                                        key={service._id}
+                                        style={[
+                                            styles.productCard,
+                                            {
+                                                backgroundColor: theme.cardBackground,
+                                                borderWidth: inCart ? 2 : 1,
+                                                borderColor: inCart ? '#34C759' : 'rgba(0,0,0,0.05)',
+                                                elevation: inCart ? 15 : 5,
+                                                shadowColor: inCart ? '#34C759' : '#000',
+                                            }
+                                        ]}
+                                        onPress={() => handleItemClick(service)}
+                                    >
+                                        <View style={[styles.productImagePlaceholder, { backgroundColor: theme.inputBackground }]}>
+                                            <MaterialCommunityIcons name="wrench" size={32} color="#34C759" />
+                                            {inCart && (
+                                                <View style={[styles.qtyBadge, { backgroundColor: '#34C759' }]}>
+                                                    <Text style={[styles.qtyBadgeText, { color: '#FFF' }]}>{inCart.quantity}</Text>
                                                 </View>
-                                                <View style={{ padding: 12 }}>
-                                                    <Text style={[styles.productName, { color: theme.text }]} numberOfLines={2}>{product.name}</Text>
-                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <Text style={[styles.productPrice, { color: theme.text }]}>
-                                                            {(product.sellingPrice || product.price || 0).toFixed(2)} {t('wallet.sar')}
-                                                        </Text>
-                                                        <View style={styles.smallAddBtn}>
-                                                            <MaterialCommunityIcons name="plus" size={16} color="#1C1C1E" />
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )
-                                    })}
-
-                                    {hasMore && (
-                                        <TouchableOpacity
-                                            onPress={loadMoreProducts}
-                                            style={{ width: '100%', padding: 15, alignItems: 'center', justifyContent: 'center' }}
-                                        >
-                                            {isLoadingMore ? (
-                                                <ActivityIndicator color="#F4C430" />
-                                            ) : (
-                                                <Text style={{ color: theme.text, fontWeight: 'bold' }}>Load More Products</Text>
                                             )}
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {displayedProducts.length === 0 && !isLoading && (
-                                        <View style={{ width: '100%', padding: 30, alignItems: 'center' }}>
-                                            <Text style={{ color: theme.subText }}>No products found in this service</Text>
                                         </View>
-                                    )}
-                                </>
-                            )
-                        }
-                    </View >
-                )
-                }
+                                        <View style={{ padding: 14 }}>
+                                            <Text style={[styles.productName, { color: theme.text }]} numberOfLines={2}>{service.name}</Text>
+                                            <Text style={[styles.productPrice, { color: '#34C759' }]}>{parseFloat(service.price as string).toFixed(2)} SAR</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                )
+                            })}
+                        </View>
+                    </View>
+                )}
                 {
                     viewState === 'cart' && (
                         <View style={{ gap: 15 }}>
@@ -891,26 +1027,33 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                 }
             </ScrollView >
 
-            {/* Cart Summary Bar */}
-            {
-                cart.length > 0 && (
-                    <View style={[styles.cartBar, { backgroundColor: theme.cardBackground, borderTopColor: theme.border }]}>
+            {/* Bottom Sticky Unified Footer */}
+            {(selectedProduct || cart.length > 0) && (
+                <View style={[styles.bottomActionFooter, { backgroundColor: theme.cardBackground, borderTopColor: theme.border, height: 110 }]}>
+                    <View style={{ flex: 1 }}>
                         <View>
-                            <Text style={{ color: theme.subText }}>{cart.length} {t('pos.products_selected')}</Text>
-                            <Text style={[styles.totalAmount, { color: theme.text }]}>{totals.grandTotal.toFixed(2)} {t('wallet.sar')}</Text>
+                            <Text style={{ color: theme.subText, fontSize: 12 }}>{cart.length} {t('pos.items_in_cart')}</Text>
+                            <Text style={[styles.totalAmount, { color: theme.text }]}>Total: {totals.grandTotal.toFixed(2)} {t('wallet.sar')}</Text>
                         </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                        {/* Edit Pencil removed from here as we use direct Review Order for details */}
+
                         <TouchableOpacity
-                            style={[styles.actionBtn, { backgroundColor: '#F4C430' }]}
+                            style={[styles.primaryBottomBtn, { backgroundColor: '#F4C430', minWidth: 150 }]}
                             onPress={() => {
                                 setIsReviewMode(true);
                                 setShowSidebar(true);
                             }}
                         >
-                            <Text style={{ color: '#1C1C1E', fontWeight: 'bold' }}>{t('pos.add_to_cart')}</Text>
+                            <Text style={{ color: '#1C1C1E', fontWeight: 'bold', fontSize: 16 }}>
+                                {isReviewMode ? t('pos.checkout') : t('pos.review_order')}
+                            </Text>
                         </TouchableOpacity>
                     </View>
-                )
-            }
+                </View>
+            )}
 
             {/* Product/Cart Sidebar */}
             <Modal visible={showSidebar} transparent animationType="slide" onRequestClose={() => setShowSidebar(false)}>
@@ -919,7 +1062,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                         <View style={styles.sidebarHeader}>
                             <View>
                                 <Text style={[styles.sidebarTitle, { color: theme.text }]}>{isReviewMode ? t('pos.order_review') : t('common.dashboard')}</Text>
-                                <Text style={{ color: '#F4C430', fontWeight: 'bold' }}>{isReviewMode ? `${cart.length} ${t('pos.items_in_cart')}` : selectedService?.name}</Text>
+                                <Text style={{ color: '#F4C430', fontWeight: 'bold' }}>{isReviewMode ? `${cart.length} ${t('pos.items_in_cart')}` : selectedDepartment?.name || 'Products'}</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowSidebar(false)}>
                                 <MaterialCommunityIcons name="close" size={24} color={theme.text} />
@@ -928,85 +1071,192 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
 
                         {isReviewMode ? (
                             <ScrollView showsVerticalScrollIndicator={false}>
-                                {cart.map((item) => (
-                                    <View key={item._id} style={[styles.reviewItemCard, { backgroundColor: theme.inputBackground, flexDirection: 'column', alignItems: 'stretch' }]}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.reviewItemName, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-                                                <Text style={{ color: theme.subText, fontSize: 12 }}>
-                                                    {(item.sellingPrice || 0).toFixed(2)} {t('wallet.sar')} {item.taxPercentage ? `(+${item.taxPercentage}%)` : ''}
-                                                </Text>
-                                            </View>
-                                            <TouchableOpacity onPress={() => removeFromCart(item._id)} style={{ padding: 5 }}>
-                                                <MaterialCommunityIcons name="close-circle-outline" size={24} color="#FF3B30" />
-                                            </TouchableOpacity>
-                                        </View>
+                                {/* Services Section */}
+                                {cart.some(item => item.category === 'service') && (
+                                    <View style={{ marginBottom: 20 }}>
+                                        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 16, marginBottom: 10 }]}>Services</Text>
+                                        {cart.filter(item => item.category === 'service').map((item) => {
+                                            const itemPrice = (item.sellingPrice || item.price || 0) * item.quantity;
+                                            const itemDiscount = item.isDiscountPercentage ? (itemPrice * (item.discount / 100)) : item.discount;
+                                            const taxableAmount = itemPrice - itemDiscount;
+                                            const itemTax = taxableAmount * ((item.taxPercentage || 0) / 100);
+                                            const itemTotal = taxableAmount + itemTax;
 
-                                        {/* Quantity Row */}
-                                        <View style={[styles.controlRow, { marginBottom: 10 }]}>
-                                            <Text style={[styles.controlLabel, { color: theme.text }]}>{t('pos.quantity')}</Text>
-                                            <View style={styles.qtyControl}>
-                                                <TouchableOpacity onPress={() => updateCartItem(item._id, { quantity: Math.max(0.1, item.quantity - 1) })} style={styles.circularBtn}>
-                                                    <MaterialCommunityIcons name="minus" size={16} color={theme.text} />
-                                                </TouchableOpacity>
-                                                <TextInput
-                                                    style={[styles.smallInput, { color: theme.text, backgroundColor: theme.cardBackground }]}
-                                                    value={item.quantity.toString()}
-                                                    keyboardType="decimal-pad"
-                                                    onChangeText={(txt) => {
-                                                        const val = parseFloat(txt);
-                                                        if (!isNaN(val) && val >= 0) updateCartItem(item._id, { quantity: val });
-                                                    }}
-                                                />
-                                                <TouchableOpacity onPress={() => updateCartItem(item._id, { quantity: item.quantity + 1 })} style={styles.circularBtn}>
-                                                    <MaterialCommunityIcons name="plus" size={16} color={theme.text} />
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
+                                            return (
+                                                <View key={item._id} style={[styles.reviewItemCard, { backgroundColor: theme.inputBackground, flexDirection: 'column', alignItems: 'stretch', padding: 12, marginBottom: 8 }]}>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                                        <Text style={[styles.reviewItemName, { color: theme.text, fontWeight: 'bold' }]} numberOfLines={1}>{item.name}</Text>
+                                                        <TouchableOpacity onPress={() => removeFromCart(item._id)}>
+                                                            <MaterialCommunityIcons name="close-circle-outline" size={22} color="#FF3B30" />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                        <Text style={{ color: theme.subText, fontSize: 12 }}>Price</Text>
+                                                        <Text style={{ color: theme.text, fontSize: 13 }}>{(item.sellingPrice || 0).toFixed(2)}</Text>
+                                                    </View>
+                                                    {itemDiscount > 0 && (
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                            <Text style={{ color: theme.subText, fontSize: 12 }}>Discount</Text>
+                                                            <Text style={{ color: '#FF3B30', fontSize: 13 }}>- {itemDiscount.toFixed(2)}</Text>
+                                                        </View>
+                                                    )}
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                        <Text style={{ color: theme.subText, fontSize: 12 }}>Tax ({item.taxPercentage || 0}%)</Text>
+                                                        <Text style={{ color: theme.text, fontSize: 13 }}>+ {itemTax.toFixed(2)}</Text>
+                                                    </View>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 5, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 5 }}>
+                                                        <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 13 }}>Subtotal</Text>
+                                                        <Text style={{ color: '#F4C430', fontWeight: 'bold', fontSize: 14 }}>{itemTotal.toFixed(2)}</Text>
+                                                    </View>
 
-                                        {/* Discount Row */}
-                                        <View style={styles.controlRow}>
-                                            <Text style={[styles.controlLabel, { color: theme.text }]}>{t('pos.discount')}</Text>
-                                            <View style={styles.qtyControl}>
-                                                <TextInput
-                                                    style={[styles.smallInput, { color: theme.text, backgroundColor: theme.cardBackground, width: 70 }]}
-                                                    value={item.discount.toString()}
-                                                    keyboardType="decimal-pad"
-                                                    onChangeText={(txt) => {
-                                                        const val = parseFloat(txt);
-                                                        if (!isNaN(val)) updateCartItem(item._id, { discount: val });
-                                                    }}
-                                                />
-                                                <TouchableOpacity
-                                                    style={[styles.toggleBtn, { backgroundColor: item.isDiscountPercentage ? '#F4C430' : theme.cardBackground }]}
-                                                    onPress={() => updateCartItem(item._id, { isDiscountPercentage: !item.isDiscountPercentage })}
-                                                >
-                                                    <Text style={{ fontWeight: 'bold', color: item.isDiscountPercentage ? '#1C1C1E' : theme.text }}>%</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
+                                                    {/* Services Discount Control (Optional per item) */}
+                                                    <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5 }}>
+                                                        <Text style={{ color: theme.subText, fontSize: 10 }}>Disc:</Text>
+                                                        <TextInput
+                                                            style={[styles.smallInput, { color: theme.text, backgroundColor: theme.cardBackground, width: 50, height: 25, fontSize: 12, paddingVertical: 0 }]}
+                                                            value={item.discount.toString()}
+                                                            keyboardType="decimal-pad"
+                                                            onChangeText={(txt) => {
+                                                                if (txt === '') {
+                                                                    updateCartItem(item._id, { discount: 0 });
+                                                                } else if (/^\d*\.?\d*$/.test(txt)) {
+                                                                    const val = parseFloat(txt);
+                                                                    if (!isNaN(val)) {
+                                                                        updateCartItem(item._id, { discount: val });
+                                                                    }
+                                                                }
+                                                            }}
+                                                        />
+                                                        <TouchableOpacity
+                                                            style={[styles.toggleBtn, { width: 25, height: 25, backgroundColor: item.isDiscountPercentage ? '#F4C430' : theme.cardBackground }]}
+                                                            onPress={() => updateCartItem(item._id, { isDiscountPercentage: !item.isDiscountPercentage })}
+                                                        >
+                                                            <Text style={{ fontWeight: 'bold', fontSize: 10, color: item.isDiscountPercentage ? '#1C1C1E' : theme.text }}>%</Text>
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            );
+                                        })}
                                     </View>
-                                ))}
+                                )}
+
+                                {/* Products Section */}
+                                {cart.some(item => item.category !== 'service') && (
+                                    <View>
+                                        <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 16, marginBottom: 10 }]}>Products</Text>
+                                        {cart.filter(item => item.category !== 'service').map((item) => {
+                                            const itemPrice = (item.sellingPrice || item.price || 0) * item.quantity;
+                                            const itemDiscount = item.isDiscountPercentage ? (itemPrice * (item.discount / 100)) : item.discount;
+                                            const taxableAmount = itemPrice - itemDiscount;
+                                            const itemTax = taxableAmount * ((item.taxPercentage || 0) / 100);
+                                            const itemTotal = taxableAmount + itemTax;
+
+                                            return (
+                                                <View key={item._id} style={[styles.reviewItemCard, { backgroundColor: theme.inputBackground, flexDirection: 'column', alignItems: 'stretch', padding: 12, marginBottom: 8 }]}>
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
+                                                        <Text style={[styles.reviewItemName, { color: theme.text, fontWeight: 'bold', flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+                                                        <TouchableOpacity onPress={() => removeFromCart(item._id)}>
+                                                            <MaterialCommunityIcons name="close-circle-outline" size={22} color="#FF3B30" />
+                                                        </TouchableOpacity>
+                                                    </View>
+
+                                                    {/* Detailed Breakdown */}
+                                                    <View style={{ gap: 2, marginBottom: 8 }}>
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                            <Text style={{ color: theme.subText, fontSize: 12 }}>Rate x Qty</Text>
+                                                            <Text style={{ color: theme.text, fontSize: 13 }}>{(item.sellingPrice || 0).toFixed(2)} x {item.quantity}</Text>
+                                                        </View>
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                            <Text style={{ color: theme.subText, fontSize: 12 }}>Gross</Text>
+                                                            <Text style={{ color: theme.text, fontSize: 13 }}>{itemPrice.toFixed(2)}</Text>
+                                                        </View>
+                                                        {itemDiscount > 0 && (
+                                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                                <Text style={{ color: theme.subText, fontSize: 12 }}>Discount</Text>
+                                                                <Text style={{ color: '#FF3B30', fontSize: 13 }}>- {itemDiscount.toFixed(2)}</Text>
+                                                            </View>
+                                                        )}
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                                            <Text style={{ color: theme.subText, fontSize: 12 }}>Tax ({item.taxPercentage || 0}%)</Text>
+                                                            <Text style={{ color: theme.text, fontSize: 13 }}>+ {itemTax.toFixed(2)}</Text>
+                                                        </View>
+                                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2, borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 2 }}>
+                                                            <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 13 }}>Subtotal</Text>
+                                                            <Text style={{ color: '#F4C430', fontWeight: 'bold', fontSize: 14 }}>{itemTotal.toFixed(2)}</Text>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* Controls */}
+                                                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 5, paddingTop: 5, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' }}>
+                                                        {/* Qty Control */}
+                                                        <View style={[styles.qtyControl, { height: 30 }]}>
+                                                            <TouchableOpacity onPress={() => updateCartItem(item._id, { quantity: Math.max(0.1, (item.quantity || 0) - 1) })} style={[styles.circularBtn, { width: 24, height: 24 }]}>
+                                                                <MaterialCommunityIcons name="minus" size={14} color={theme.text} />
+                                                            </TouchableOpacity>
+                                                            <TextInput
+                                                                style={{ color: theme.text, marginHorizontal: 4, fontWeight: 'bold', minWidth: 30, textAlign: 'center', padding: 0 }}
+                                                                value={item.quantity === 0 ? '' : item.quantity.toString()}
+                                                                keyboardType="decimal-pad"
+                                                                onChangeText={(txt) => {
+                                                                    if (txt === '') {
+                                                                        updateCartItem(item._id, { quantity: 0 });
+                                                                    } else if (/^\d*\.?\d*$/.test(txt)) {
+                                                                        const val = parseFloat(txt);
+                                                                        if (!isNaN(val) && val >= 0) {
+                                                                            updateCartItem(item._id, { quantity: val });
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+
+                                                            <TouchableOpacity onPress={() => updateCartItem(item._id, { quantity: (item.quantity || 0) + 1 })} style={[styles.circularBtn, { width: 24, height: 24 }]}>
+                                                                <MaterialCommunityIcons name="plus" size={14} color={theme.text} />
+                                                            </TouchableOpacity>
+                                                        </View>
+
+                                                        {/* Discount Control */}
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                                            <Text style={{ color: theme.subText, fontSize: 10 }}>Disc:</Text>
+                                                            <TextInput
+                                                                style={[styles.smallInput, { color: theme.text, backgroundColor: theme.cardBackground, width: 50, height: 25, fontSize: 12, paddingVertical: 0 }]}
+                                                                value={item.discount === 0 ? '' : item.discount.toString()}
+                                                                keyboardType="decimal-pad"
+                                                                onChangeText={(txt) => {
+                                                                    if (txt === '') {
+                                                                        updateCartItem(item._id, { discount: 0 });
+                                                                    } else if (/^\d*\.?\d*$/.test(txt)) {
+                                                                        const val = parseFloat(txt);
+                                                                        if (!isNaN(val)) {
+                                                                            updateCartItem(item._id, { discount: val });
+                                                                        }
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <TouchableOpacity
+                                                                style={[styles.toggleBtn, { width: 25, height: 25, backgroundColor: item.isDiscountPercentage ? '#F4C430' : theme.cardBackground }]}
+                                                                onPress={() => updateCartItem(item._id, { isDiscountPercentage: !item.isDiscountPercentage })}
+                                                            >
+                                                                <Text style={{ fontWeight: 'bold', fontSize: 10, color: item.isDiscountPercentage ? '#1C1C1E' : theme.text }}>%</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+                                                    </View>
+                                                </View>
+                                            )
+                                        })}
+                                    </View>
+                                )}
 
                                 <View style={[styles.summaryBox, { backgroundColor: isDarkMode ? '#1C1C1E' : '#FFF9E6', marginTop: 20 }]}>
                                     <View style={[styles.summaryRow]}>
-                                        <Text style={{ color: theme.subText }}>Service Labor ({selectedService?.name})</Text>
-                                        <Text style={{ color: theme.text }}>{totals.servicePrice.toFixed(2)}</Text>
-                                    </View>
-                                    <View style={[styles.summaryRow]}>
-                                        <Text style={{ color: theme.subText }}>Service Tax ({selectedService?.taxPercentage || 0}%)</Text>
-                                        <Text style={{ color: theme.text }}>{totals.serviceTax.toFixed(2)}</Text>
-                                    </View>
-                                    <View style={[styles.summaryRow]}>
-                                        <Text style={{ color: theme.subText }}>Products Gross</Text>
-                                        <Text style={{ color: theme.text }}>{(totals.grossTotal - totals.servicePrice).toFixed(2)}</Text>
+                                        <Text style={{ color: theme.subText }}>Gross Total</Text>
+                                        <Text style={{ color: theme.text }}>{totals.grossTotal.toFixed(2)}</Text>
                                     </View>
                                     <View style={[styles.summaryRow]}>
                                         <Text style={{ color: theme.subText }}>{t('pos.discount')}</Text>
                                         <Text style={{ color: '#FF3B30' }}>- {totals.totalDiscount.toFixed(2)}</Text>
                                     </View>
                                     <View style={[styles.summaryRow, { borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 10, marginBottom: 10 }]}>
-                                        <Text style={{ color: theme.subText }}>Total Tax (incl. Service)</Text>
+                                        <Text style={{ color: theme.subText }}>Total Tax</Text>
                                         <Text style={{ color: theme.text }}>+ {totals.totalTax.toFixed(2)}</Text>
                                     </View>
                                     <View style={[styles.summaryRow]}>
@@ -1039,65 +1289,100 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                                             </Text>
                                         </View>
 
-                                        <View style={styles.formGroup}>
-                                            <Text style={[styles.label, { color: theme.text }]}>{t('pos.quantity')}</Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                                <TouchableOpacity
-                                                    style={[styles.qtyBtn, { backgroundColor: theme.inputBackground }]}
-                                                    onPress={() => setQuantity(Math.max(0, parseFloat(quantity || '0') - 1).toString())}
-                                                >
-                                                    <MaterialCommunityIcons name="minus" size={24} color={theme.text} />
-                                                </TouchableOpacity>
-                                                <TextInput
-                                                    style={[styles.qtyInput, { color: theme.text, backgroundColor: theme.inputBackground }]}
-                                                    value={quantity}
-                                                    keyboardType="decimal-pad"
-                                                    onChangeText={setQuantity}
-                                                    textAlign="center"
-                                                />
-                                                <TouchableOpacity
-                                                    style={[styles.qtyBtn, { backgroundColor: theme.inputBackground }]}
-                                                    onPress={() => setQuantity((parseFloat(quantity || '0') + 1).toString())}
-                                                >
-                                                    <MaterialCommunityIcons name="plus" size={24} color={theme.text} />
-                                                </TouchableOpacity>
+                                        {selectedProduct.category !== 'service' && (
+                                            <View style={styles.formGroup}>
+                                                <Text style={[styles.label, { color: theme.text }]}>{t('pos.quantity')}</Text>
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                    <TouchableOpacity
+                                                        style={[styles.qtyBtn, { backgroundColor: theme.inputBackground }]}
+                                                        onPress={() => {
+                                                            const val = parseFloat(quantity || '0') - 1;
+                                                            if (val > 0) setQuantity(val.toString());
+                                                        }}
+                                                    >
+                                                        <MaterialCommunityIcons name="minus" size={24} color={theme.text} />
+                                                    </TouchableOpacity>
+                                                    <TextInput
+                                                        style={[styles.qtyInput, { color: theme.text, backgroundColor: theme.inputBackground }]}
+                                                        value={quantity}
+                                                        keyboardType="decimal-pad"
+                                                        onChangeText={(text) => {
+                                                            if (text === '' || /^\d*\.?\d*$/.test(text)) {
+                                                                setQuantity(text);
+                                                            }
+                                                        }}
+                                                        textAlign="center"
+                                                        placeholder="1"
+                                                        placeholderTextColor={theme.subText}
+                                                    />
+                                                    <TouchableOpacity
+                                                        style={[styles.qtyBtn, { backgroundColor: theme.inputBackground }]}
+                                                        onPress={() => {
+                                                            const val = parseFloat(quantity || '0') + 1;
+                                                            setQuantity(val.toString());
+                                                        }}
+                                                    >
+                                                        <MaterialCommunityIcons name="plus" size={24} color={theme.text} />
+                                                    </TouchableOpacity>
+                                                </View>
                                             </View>
-                                        </View>
+                                        )}
 
                                         <View style={styles.formGroup}>
-                                            <Text style={[styles.label, { color: theme.text }]}>{t('pos.discount')} ({t('wallet.sar')})</Text>
-                                            <TextInput
-                                                style={[styles.input, { color: theme.text, backgroundColor: theme.inputBackground }]}
-                                                value={discount}
-                                                keyboardType="numeric"
-                                                onChangeText={setDiscount}
-                                                placeholder="0.00"
-                                                placeholderTextColor={theme.subText}
-                                            />
+                                            <Text style={[styles.label, { color: theme.text }]}>{t('pos.discount')} {isDiscountPercentage ? '(%)' : `(${t('wallet.sar')})`}</Text>
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                                <TextInput
+                                                    style={[styles.input, { color: theme.text, backgroundColor: theme.inputBackground, flex: 1 }]}
+                                                    value={discount}
+                                                    keyboardType="decimal-pad"
+                                                    onChangeText={(text) => {
+                                                        if (text === '' || /^\d*\.?\d*$/.test(text)) {
+                                                            setDiscount(text);
+                                                        }
+                                                    }}
+                                                    placeholder="0.00"
+                                                    placeholderTextColor={theme.subText}
+                                                />
+                                                <TouchableOpacity
+                                                    style={[
+                                                        styles.percentToggleBtn,
+                                                        {
+                                                            backgroundColor: isDiscountPercentage ? '#F4C430' : theme.inputBackground,
+                                                            borderColor: isDiscountPercentage ? '#F4C430' : theme.border
+                                                        }
+                                                    ]}
+                                                    onPress={() => setIsDiscountPercentage(!isDiscountPercentage)}
+                                                >
+                                                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: isDiscountPercentage ? '#1C1C1E' : theme.text }}>%</Text>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
 
                                         <View style={[styles.summaryBox, { backgroundColor: isDarkMode ? '#1C1C1E' : '#FFF9E6' }]}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                <Text style={{ color: theme.subText }}>Service Labor ({selectedService?.name})</Text>
-                                                <Text style={{ color: theme.text }}>{totals.servicePrice.toFixed(2)}</Text>
-                                            </View>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                <Text style={{ color: theme.subText }}>Service Tax ({selectedService?.taxPercentage || 0}%)</Text>
-                                                <Text style={{ color: theme.text }}>{totals.serviceTax.toFixed(2)}</Text>
-                                            </View>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                                                <Text style={{ color: theme.subText }}>Product Subtotal ({selectedProduct.name})</Text>
-                                                <Text style={{ color: theme.text }}>{((selectedProduct.sellingPrice || 0) * parseFloat(quantity || '1')).toFixed(2)}</Text>
+                                                <Text style={{ color: theme.subText, fontSize: 13 }} numberOfLines={1}>Product Subtotal</Text>
+                                                <Text style={{ color: theme.text }}>{((selectedProduct.sellingPrice || 0) * (parseFloat(quantity) || 0)).toFixed(2)}</Text>
                                             </View>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                                <Text style={{ color: theme.subText }}>{t('pos.discount')}</Text>
-                                                <Text style={{ color: '#FF3B30' }}>- {parseFloat(discount || '0').toFixed(2)}</Text>
+                                                <Text style={{ color: theme.subText, fontSize: 13 }}>{t('pos.discount')} {isDiscountPercentage ? `(${discount}%)` : ''}</Text>
+                                                <Text style={{ color: '#FF3B30' }}>
+                                                    - {isDiscountPercentage
+                                                        ? (((selectedProduct.sellingPrice || 0) * (parseFloat(quantity) || 0)) * (parseFloat(discount) || 0) / 100).toFixed(2)
+                                                        : (parseFloat(discount) || 0).toFixed(2)}
+                                                </Text>
                                             </View>
                                             <View style={{ height: 1, backgroundColor: theme.border, marginBottom: 8 }} />
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                                 <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 16 }}>{t('pos.total_amount')}</Text>
                                                 <Text style={{ color: '#F4C430', fontWeight: 'bold', fontSize: 18 }}>
-                                                    {(((selectedProduct.sellingPrice || 0) * parseFloat(quantity || '1')) - parseFloat(discount || '0') + totals.servicePrice + totals.serviceTax).toFixed(2)} {t('wallet.sar')}
+                                                    <Text style={{ color: '#F4C430', fontWeight: 'bold', fontSize: 18 }}>
+                                                        {(
+                                                            ((selectedProduct.sellingPrice || 0) * (parseFloat(quantity) || 0)) -
+                                                            (isDiscountPercentage
+                                                                ? (((selectedProduct.sellingPrice || 0) * (parseFloat(quantity) || 0)) * (parseFloat(discount) || 0) / 100)
+                                                                : (parseFloat(discount) || 0))
+                                                        ).toFixed(2)} {t('wallet.sar')}
+                                                    </Text>
                                                 </Text>
                                             </View>
                                         </View>
@@ -1138,7 +1423,7 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                         </View>
 
                         <Text style={{ color: theme.subText, marginBottom: 15 }}>
-                            {t('pos.select_tech_for')} {selectedService ? selectedService.name : 'Service'}
+                            {t('pos.select_tech_for')} {cart.filter(i => i.category === 'service').map(s => s.name).join(', ') || t('common.services')}
                         </Text>
 
                         <ScrollView
@@ -1147,43 +1432,29 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                             style={{ flexGrow: 0 }}
                         >
                             {filteredTechnicians.length > 0 ? (
-                                <>
-                                    {filteredTechnicians.map(tech => (
-                                        <TouchableOpacity
-                                            key={tech._id}
-                                            style={[styles.reviewItemCard, { backgroundColor: theme.inputBackground, flexDirection: 'row', alignItems: 'center' }]}
-                                            onPress={() => handleAssignTechnician(tech)}
-                                        >
-                                            <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: theme.cardBackground, alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
-                                                <MaterialCommunityIcons name="account-wrench" size={24} color="#F4C430" />
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={[styles.reviewItemName, { color: theme.text }]}>{tech.name}</Text>
-                                                <Text style={{ color: theme.subText, fontSize: 12 }}>{tech.specialization || 'General Technician'}</Text>
-                                            </View>
-                                            <MaterialCommunityIcons name="chevron-right" size={24} color={theme.subText} />
-                                        </TouchableOpacity>
-                                    ))}
-
-                                    {filteredTechnicians.length < technicians.length && (
-                                        <TouchableOpacity
-                                            style={{ marginTop: 10, padding: 15, alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: theme.border, borderRadius: 12 }}
-                                            onPress={() => setFilteredTechnicians(technicians)}
-                                        >
-                                            <Text style={{ color: '#F4C430', fontWeight: 'bold' }}>+ Show Other Technicians</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </>
+                                filteredTechnicians.map(tech => (
+                                    <TouchableOpacity
+                                        key={tech._id}
+                                        style={[styles.reviewItemCard, { backgroundColor: theme.inputBackground, flexDirection: 'row', alignItems: 'center', marginBottom: 10 }]}
+                                        onPress={() => handleAssignTechnician(tech)}
+                                    >
+                                        <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: theme.cardBackground, alignItems: 'center', justifyContent: 'center', marginRight: 15 }}>
+                                            <MaterialCommunityIcons name="account-wrench" size={24} color="#F4C430" />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[styles.reviewItemName, { color: theme.text, fontSize: 16 }]}>{tech.name}</Text>
+                                            <Text style={{ color: theme.subText, fontSize: 13 }}>{tech.specialization || 'General Technician'}</Text>
+                                        </View>
+                                        <MaterialCommunityIcons name="chevron-right" size={24} color={theme.subText} />
+                                    </TouchableOpacity>
+                                ))
                             ) : (
                                 <View style={{ alignItems: 'center', marginTop: 30 }}>
                                     <MaterialCommunityIcons name="account-search" size={50} color={theme.subText} />
-                                    <Text style={{ color: theme.subText, marginTop: 10 }}>No technicians found for this service.</Text>
-                                    <TouchableOpacity
-                                        style={{ marginTop: 20, padding: 10 }}
-                                        onPress={() => setFilteredTechnicians(technicians)}
-                                    >
-                                        <Text style={{ color: '#F4C430', fontWeight: 'bold' }}>Show All Technicians</Text>
-                                    </TouchableOpacity>
+                                    <Text style={{ color: theme.text, marginTop: 10, fontWeight: 'bold' }}>No technicians found</Text>
+                                    <Text style={{ color: theme.subText, marginTop: 5, textAlign: 'center', maxWidth: 250 }}>
+                                        No technicians are linked to this department. Please add them in the Provider Dashboard.
+                                    </Text>
                                 </View>
                             )}
                         </ScrollView>
@@ -1209,82 +1480,90 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                                 </TouchableOpacity>
                             </View>
 
-                            <ScrollView showsVerticalScrollIndicator={false}>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Customer Name</Text>
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 5 }}>
+                                <View style={[styles.formGroup, { marginBottom: 12 }]}>
+                                    <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Customer Name</Text>
                                     <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
                                         value={customerInfo.name}
                                         onChangeText={(text) => setCustomerInfo({ ...customerInfo, name: text })}
                                         placeholder="Enter Name"
                                         placeholderTextColor={theme.subText}
                                     />
                                 </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>VAT No.</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.vatNo}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, vatNo: text })}
-                                        placeholder="Enter VAT Number"
-                                        placeholderTextColor={theme.subText}
-                                    />
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Mobile Number *</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.phone}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, phone: text })}
+                                            placeholder="05xxxxxxxx"
+                                            placeholderTextColor={theme.subText}
+                                            keyboardType="phone-pad"
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>VAT No.</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.vatNo}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, vatNo: text })}
+                                            placeholder="Optional"
+                                            placeholderTextColor={theme.subText}
+                                        />
+                                    </View>
                                 </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Mobile Number *</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.phone}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, phone: text })}
-                                        placeholder="05xxxxxxxx"
-                                        placeholderTextColor={theme.subText}
-                                        keyboardType="phone-pad"
-                                    />
+
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Vehicle No. *</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.vehicleNo}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleNo: text })}
+                                            placeholder="ABC-1234"
+                                            placeholderTextColor={theme.subText}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Odometer (km)</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.odometerReading}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, odometerReading: text })}
+                                            placeholder="e.g. 50000"
+                                            placeholderTextColor={theme.subText}
+                                            keyboardType="numeric"
+                                        />
+                                    </View>
                                 </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Vehicle No. *</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.vehicleNo}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleNo: text })}
-                                        placeholder="ABC-1234"
-                                        placeholderTextColor={theme.subText}
-                                    />
-                                </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Vehicle Make</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.vehicleMake}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleMake: text })}
-                                        placeholder="e.g., Toyota, Honda"
-                                        placeholderTextColor={theme.subText}
-                                    />
-                                </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Vehicle Model</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.vehicleModel}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleModel: text })}
-                                        placeholder="e.g., Camry, Civic"
-                                        placeholderTextColor={theme.subText}
-                                    />
-                                </View>
-                                <View style={styles.formGroup}>
-                                    <Text style={[styles.label, { color: theme.text }]}>Odometer Reading</Text>
-                                    <TextInput
-                                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                                        value={customerInfo.odometerReading}
-                                        onChangeText={(text) => setCustomerInfo({ ...customerInfo, odometerReading: text })}
-                                        placeholder="e.g., 50000 km"
-                                        placeholderTextColor={theme.subText}
-                                        keyboardType="numeric"
-                                    />
+
+                                <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Make</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.vehicleMake}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleMake: text })}
+                                            placeholder="Toyota"
+                                            placeholderTextColor={theme.subText}
+                                        />
+                                    </View>
+                                    <View style={[styles.formGroup, { flex: 1, marginBottom: 12 }]}>
+                                        <Text style={[styles.label, { color: theme.text, fontSize: 13, marginBottom: 4 }]}>Model</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text, height: 45, fontSize: 14 }]}
+                                            value={customerInfo.vehicleModel}
+                                            onChangeText={(text) => setCustomerInfo({ ...customerInfo, vehicleModel: text })}
+                                            placeholder="Camry"
+                                            placeholderTextColor={theme.subText}
+                                        />
+                                    </View>
                                 </View>
 
                                 <TouchableOpacity
-                                    style={styles.mainActionBtn}
+                                    style={[styles.mainActionBtn, { marginTop: 10 }]}
                                     onPress={handleConfirmOrder}
                                     disabled={assigningLoading}
                                 >
@@ -1302,14 +1581,64 @@ export function CashierPOSScreen({ onLogout, navigation }: CashierPOSScreenProps
                     </View >
                 </KeyboardAvoidingView >
             </Modal >
-        </View >
+            {/* Category Filter Modal */}
+            <Modal visible={showCategoryModal} transparent animationType="fade" onRequestClose={() => setShowCategoryModal(false)}>
+                <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.7)' }]}>
+                    <View style={[styles.popupContent, { backgroundColor: theme.cardBackground, maxHeight: '65%' }]}>
+                        <View style={styles.modalHeader}>
+                            <View>
+                                <Text style={[styles.modalTitle, { color: theme.text }]}>Categories</Text>
+                                <Text style={{ color: theme.subText, fontSize: 12 }}>Select to filter products</Text>
+                            </View>
+                            <TouchableOpacity onPress={() => setShowCategoryModal(false)} style={styles.closeModalBtn}>
+                                <MaterialCommunityIcons name="close" size={22} color={theme.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 10 }}>
+                            <TouchableOpacity
+                                style={[styles.modalCatItem, { borderBottomColor: theme.border }]}
+                                onPress={() => { handleCategoryFilter('All'); setShowCategoryModal(false); }}
+                            >
+                                <Text style={{ color: selectedCategory === 'All' ? '#F4C430' : theme.text, fontWeight: 'bold', fontSize: 15 }}>All Products</Text>
+                                {selectedCategory === 'All' && <MaterialCommunityIcons name="check-circle" size={22} color="#F4C430" />}
+                            </TouchableOpacity>
+                            {categories.map((cat) => (
+                                <TouchableOpacity
+                                    key={cat._id}
+                                    style={[styles.modalCatItem, { borderBottomColor: theme.border }]}
+                                    onPress={() => { handleCategoryFilter(cat.name); setShowCategoryModal(false); }}
+                                >
+                                    <View>
+                                        <Text style={{ color: selectedCategory === cat.name ? '#F4C430' : theme.text, fontWeight: 'bold', fontSize: 15 }}>{cat.name}</Text>
+                                    </View>
+                                    {selectedCategory === cat.name && <MaterialCommunityIcons name="check-circle" size={22} color="#F4C430" />}
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
+    rootContainer: { flex: 1, paddingTop: Platform.OS === 'android' ? 10 : 0 },
     container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, elevation: 2, shadowOpacity: 0.05 },
-    headerTitle: { fontSize: 20, fontWeight: '800' },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        elevation: 8,
+        zIndex: 1000,
+        shadowOpacity: 0.1,
+        shadowRadius: 10
+    },
+    headerTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.5 },
+    headerActionBtn: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
     logoutBtn: { padding: 8, borderRadius: 8 },
 
     center: { alignItems: 'center', justifyContent: 'center', marginTop: 100 },
@@ -1331,19 +1660,22 @@ const styles = StyleSheet.create({
     serviceArrow: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1C1C1E', alignItems: 'center', justifyContent: 'center' },
 
     // Products Grid
-    productsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-    productCard: { width: '48%', borderRadius: 16, overflow: 'hidden', elevation: 2, shadowOpacity: 0.05 },
-    productImagePlaceholder: { height: 100, alignItems: 'center', justifyContent: 'center' },
-    productName: { fontSize: 14, fontWeight: '600', marginBottom: 8, height: 40 },
-    productPrice: { fontSize: 16, fontWeight: 'bold' },
+    productsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, paddingBottom: 150 },
+    productCard: { width: '47.5%', borderRadius: 20, overflow: 'hidden', elevation: 5, shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, marginBottom: 4 },
+    productImagePlaceholder: { height: 120, alignItems: 'center', justifyContent: 'center' },
+    productName: { fontSize: 14, fontWeight: '700', marginBottom: 6, height: 38, lineHeight: 18 },
+    productPrice: { fontSize: 15, fontWeight: '800', color: '#F4C430' },
 
     // Modals
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
     sidebarOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row', justifyContent: 'flex-end' },
-    sidebarContent: { width: '85%', maxWidth: 400, height: '100%', padding: 24, borderTopLeftRadius: 30, borderBottomLeftRadius: 30, elevation: 5 },
-    popupContent: { width: '90%', maxWidth: 400, padding: 24, borderRadius: 24, elevation: 5, maxHeight: '80%' },
-    sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30 },
-    sidebarTitle: { fontSize: 24, fontWeight: '800' },
+    sidebarContent: { width: '85%', maxWidth: 400, height: '100%', padding: 24, borderTopLeftRadius: 32, borderBottomLeftRadius: 32, elevation: 15 },
+    popupContent: { width: '88%', maxWidth: 420, padding: 24, borderRadius: 28, elevation: 15 },
+    sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
+    sidebarTitle: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 22, fontWeight: '900', letterSpacing: -0.5 },
+    closeModalBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', alignItems: 'center', justifyContent: 'center' },
 
     productDetailBox: { marginBottom: 30 },
     detailName: { fontSize: 20, fontWeight: '800', marginBottom: 8 },
@@ -1399,5 +1731,16 @@ const styles = StyleSheet.create({
     smallInput: { width: 50, height: 32, borderRadius: 8, padding: 0, textAlign: 'center', fontSize: 14, fontWeight: 'bold' },
     toggleBtn: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DDD' },
 
-    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+    catFilterChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10, borderWidth: 1, borderColor: 'transparent', height: 40, justifyContent: 'center' },
+    modalCatItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+    innerIconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+    qtyActionRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F0F0', borderRadius: 10, padding: 4, gap: 8 },
+    qtyActionBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F4C430', alignItems: 'center', justifyContent: 'center' },
+    qtyActionText: { fontSize: 14, fontWeight: 'bold', minWidth: 25, textAlign: 'center' },
+    percentToggleBtn: { width: 50, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+    smallAddBtnText: { paddingVertical: 8, paddingHorizontal: 15, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    bottomActionFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderTopWidth: 1, elevation: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, height: 100 },
+    primaryBottomBtn: { backgroundColor: '#F4C430', paddingVertical: 15, paddingHorizontal: 30, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    sidebarServiceItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1 },
 });

@@ -141,6 +141,7 @@ const addCategory = async (req, res) => {
             providerId,
             name,
             type: categoryType,
+            departmentId: req.body.departmentId || null,
             createdAt: new Date()
         };
 

@@ -60,8 +60,8 @@ const createOrder = async (req, res) => {
             totalAmount: totalAmount || 0,
             taxAmount: taxAmount || 0,
             discountAmount: discountAmount || 0,
-            paymentStatus: paymentStatus || 'pending',
-            status: orderStatus || 'pending',
+            paymentStatus: (paymentStatus || 'pending').toLowerCase(),
+            status: (orderStatus || 'pending').toLowerCase(),
             createdAt: new Date(),
         };
 
@@ -124,7 +124,7 @@ const getCustomerOrders = async (req, res) => {
 
 const getProviderOrders = async (req, res) => {
     try {
-        const { providerId, startDate, endDate } = req.query;
+        const { providerId, startDate, endDate, page = 1, limit = 20, status } = req.query;
 
         if (!providerId) {
             return res.status(400).json({
@@ -164,14 +164,37 @@ const getProviderOrders = async (req, res) => {
             }
         }
 
+        // Add Status Filter with Case Insensitivity
+        if (status) {
+            const statuses = status.split(',').map(s => s.trim()); // Don't lowercase here, let regex handle it
+            if (statuses.length > 0) {
+                // Create regex for each status to match case-insensitively
+                const statusRegexes = statuses.map(s => new RegExp(`^${s}$`, 'i'));
+                query.status = { $in: statusRegexes };
+            }
+        }
+
+        const pageNum = parseInt(page);
+        const limitNum = parseInt(limit);
+        const skip = (pageNum - 1) * limitNum;
+
+        const totalCount = await ordersCollection.countDocuments(query);
         const orders = await ordersCollection
             .find(query)
             .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
             .toArray();
 
         res.status(200).json({
             success: true,
-            data: orders
+            orders: orders, // Changed from 'data' to 'orders' to match frontend expectation
+            pagination: {
+                totalOrders: totalCount,
+                totalPages: Math.ceil(totalCount / limitNum),
+                currentPage: pageNum,
+                limit: limitNum
+            }
         });
 
     } catch (error) {

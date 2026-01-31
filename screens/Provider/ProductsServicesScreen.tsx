@@ -39,6 +39,8 @@ interface Service {
     status?: 'active' | 'inactive';
     serviceTypes?: string[];
     taxPercentage?: string;
+    departmentName?: string;
+    departmentId?: string;
 }
 
 const SERVICE_CATEGORIES = ['Diagnostics', 'Quick Service', 'Tuning', 'Detailing', 'Oil Change', 'Tires & Alignment', 'Engine', 'Electrical'];
@@ -138,6 +140,7 @@ export function ProductsServicesScreen() {
     const [activeTab, setActiveTab] = useState<'service'>('service');
     const [customCategories, setCustomCategories] = useState<any[]>([]);
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+    const [departments, setDepartments] = useState<any[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     // Custom Alert State
@@ -155,7 +158,9 @@ export function ProductsServicesScreen() {
         sku: '',
         status: 'active',
         serviceTypes: [],
-        taxPercentage: '0'
+        taxPercentage: '0',
+        departmentName: '',
+        departmentId: ''
     };
 
     const [newItem, setNewItem] = useState<Partial<Service>>(initialFormState);
@@ -183,8 +188,15 @@ export function ProductsServicesScreen() {
             if (result.success) {
                 setCustomCategories(result.categories);
             }
+
+            // Fetch Departments
+            const deptResponse = await fetch(`${API_BASE_URL}/api/departments?providerId=${providerId}`);
+            const deptResult = await deptResponse.json();
+            if (deptResult.success) {
+                setDepartments(deptResult.departments);
+            }
         } catch (error) {
-            console.error('Fetch Categories Error:', error);
+            console.error('Fetch Categories/Departments Error:', error);
         }
     };
 
@@ -273,7 +285,7 @@ export function ProductsServicesScreen() {
             }
             if (!newItem.sku) missingFields.push('SKU');
         } else {
-            if (!newItem.serviceTypes || newItem.serviceTypes.length === 0) missingFields.push('Service Type');
+            if (!newItem.subCategory) missingFields.push('Category');
             // Duration Validation
             if (!newItem.duration) {
                 missingFields.push('Duration');
@@ -318,6 +330,19 @@ export function ProductsServicesScreen() {
                 formData.append('sku', newItem.sku!);
                 formData.append('duration', newItem.duration!);
                 formData.append('serviceTypes', JSON.stringify(newItem.serviceTypes));
+            } else {
+                formData.append('subCategory', newItem.subCategory!);
+                formData.append('duration', newItem.duration!);
+                // Auto-link to service types array for backward compatibility if needed
+                formData.append('serviceTypes', JSON.stringify([newItem.subCategory]));
+
+                // Find department ID if any
+                const catObj = customCategories.find(c => c.name === newItem.subCategory);
+                if (catObj && catObj.departmentId) {
+                    formData.append('departmentId', catObj.departmentId);
+                } else if (newItem.departmentId) {
+                    formData.append('departmentId', newItem.departmentId);
+                }
             }
             formData.append('taxPercentage', newItem.taxPercentage || '0');
 
@@ -366,7 +391,13 @@ export function ProductsServicesScreen() {
     };
 
     const handleEditStart = (item: Service) => {
-        setNewItem({ ...item });
+        const catObj = customCategories.find(c => c.name === item.subCategory);
+        const dept = catObj ? departments.find(d => d._id === catObj.departmentId) : null;
+
+        setNewItem({
+            ...item,
+            departmentName: dept ? dept.name : ''
+        });
         setIsEditing(true);
         setShowAddModal(true);
     };
@@ -408,6 +439,7 @@ export function ProductsServicesScreen() {
             ...initialFormState,
             category: 'service',
             subCategory: '',
+            departmentName: ''
         });
         setIsEditing(false);
         setShowAddModal(true);
@@ -431,7 +463,7 @@ export function ProductsServicesScreen() {
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             {/* Header and Tabs */}
             <View style={[styles.header, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.title, { color: theme.text }]}>{t('products.title')}</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Services</Text>
                 <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
                     <MaterialCommunityIcons name="plus" size={20} color="#1C1C1E" />
                 </TouchableOpacity>
@@ -550,26 +582,54 @@ export function ProductsServicesScreen() {
                             <FormInput label="Service Name" required value={newItem.name} onChangeText={(text: string) => setNewItem({ ...newItem, name: text })} placeholder="Service Name" theme={theme} />
 
 
-                            {/* Service Types - Service Only */}
+                            {/* Category Dropdown - Service Only */}
                             {newItem.category === 'service' && (
                                 <View style={{ marginBottom: 16 }}>
-                                    <FormLabel text="Service Type (Multi Select)" required theme={theme} />
-                                    <View style={styles.chipContainer}>
-                                        {[
-                                            ...SERVICE_CATEGORIES,
-                                            ...customCategories.map(c => c.name)
-                                        ].map((type) => {
-                                            const isSelected = newItem.serviceTypes?.includes(type);
-                                            return (
-                                                <TouchableOpacity
-                                                    key={type}
-                                                    style={[styles.chip, { backgroundColor: isSelected ? '#1C1C1E' : theme.background, borderColor: theme.border }]}
-                                                    onPress={() => toggleServiceType(type)}>
-                                                    <Text style={[styles.chipText, { color: isSelected ? '#FFFFFF' : theme.text }]}>{type}</Text>
-                                                </TouchableOpacity>
-                                            )
-                                        })}
-                                    </View>
+                                    <FormLabel text="Category" required theme={theme} />
+                                    <TouchableOpacity
+                                        style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                        onPress={() => setIsCategoryOpen(!isCategoryOpen)}
+                                    >
+                                        <Text style={{ color: newItem.subCategory ? theme.text : theme.subText }}>
+                                            {newItem.subCategory || 'Select Category'}
+                                        </Text>
+                                        <MaterialCommunityIcons name={isCategoryOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
+                                    </TouchableOpacity>
+
+                                    {isCategoryOpen && (
+                                        <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
+                                            <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                                                {customCategories.map((cat) => (
+                                                    <TouchableOpacity
+                                                        key={cat._id}
+                                                        style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                        onPress={() => {
+                                                            const dept = departments.find(d => d._id === cat.departmentId);
+                                                            setNewItem({
+                                                                ...newItem,
+                                                                subCategory: cat.name,
+                                                                departmentName: dept ? dept.name : '',
+                                                                departmentId: cat.departmentId || ''
+                                                            });
+                                                            setIsCategoryOpen(false);
+                                                        }}
+                                                    >
+                                                        <Text style={{ color: theme.text }}>{cat.name}</Text>
+                                                        {newItem.subCategory === cat.name && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                                    </TouchableOpacity>
+                                                ))}
+                                            </ScrollView>
+                                        </View>
+                                    )}
+
+                                    {newItem.departmentName !== '' && (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingHorizontal: 4 }}>
+                                            <MaterialCommunityIcons name="office-building" size={16} color="#F4C430" />
+                                            <Text style={{ color: '#F4C430', marginLeft: 6, fontSize: 13, fontWeight: '600' }}>
+                                                Department: {newItem.departmentName}
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             )}
 

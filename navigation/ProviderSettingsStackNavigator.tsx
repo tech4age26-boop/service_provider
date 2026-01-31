@@ -8,6 +8,7 @@ import { InventoryScreen } from '../screens/Provider/InventoryScreen';
 import { CategoryScreen } from '../screens/Provider/CategoryScreen';
 import { ProductsServicesScreen } from '../screens/Provider/ProductsServicesScreen';
 import { SuppliersScreen } from '../screens/Provider/SuppliersScreen';
+import { DepartmentScreen } from '../screens/Provider/DepartmentScreen';
 
 import { AddInvoiceScreen } from '../screens/Provider/AddInvoiceScreen';
 import { ExpensesScreen } from '../screens/Provider/ExpensesScreen';
@@ -35,6 +36,7 @@ export function ProviderSettingsStackNavigator({ onLogout }: ProviderSettingsSta
             <Stack.Screen name="AddInvoice" component={AddInvoiceScreen} />
             <Stack.Screen name="Expenses" component={ExpensesScreen} />
             <Stack.Screen name="CorporateCustomers" component={CorporateCustomersScreen} />
+            <Stack.Screen name="Department" component={DepartmentScreen} />
             {/* Add other provider specific settings screens here if needed */}
         </Stack.Navigator>
     );

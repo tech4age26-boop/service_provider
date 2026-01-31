@@ -99,20 +99,23 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
             }
 
             const userData = JSON.parse(userDataStr);
-            const providerId = userData.id;
+            const providerId = userData.id || userData._id;
             console.log('Using providerId for fetch:', providerId);
 
             if (!providerId) {
                 console.log('No provider ID found in user data');
                 setIsLoading(false);
+                setRefreshing(false);
                 return;
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${providerId}`);
+            // Added timestamp as cache breaker to ensure fresh data on every pull
+            const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${providerId}&status=pending,in progress,active,started,arrived,completed&t=${Date.now()}`);
             const result = await response.json();
 
             if (result.success) {
-                console.log(`Successfully fetched ${result.data?.length} orders`);
+                const fetchedOrders = result.orders || result.data || [];
+                console.log(`Successfully fetched ${fetchedOrders.length} orders`);
 
                 const mapTaskToUI = (order: any, task: any, taskIndex: number) => {
                     const isSubTask = task !== null;
@@ -157,7 +160,7 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
                 };
 
                 let finalMapped: TechnicianOrder[] = [];
-                result.data.forEach((order: any) => {
+                fetchedOrders.forEach((order: any) => {
                     // Check top-level technician
                     if (order.technicianId === providerId || order.technicianId === userData._id) {
                         finalMapped.push(mapTaskToUI(order, null, -1));
@@ -191,9 +194,9 @@ export function TechnicianOrdersScreen({ navigation }: TechnicianOrdersScreenPro
     }, []);
 
     const onRefresh = React.useCallback(() => {
-        setRefreshing(true);
+        setIsLoading(true);
         fetchOrders();
-    }, []);
+    }, [fetchOrders]);
 
     const handleCall = (phone: string) => {
         if (phone) Linking.openURL(`tel:${phone}`);

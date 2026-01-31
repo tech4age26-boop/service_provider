@@ -9,13 +9,25 @@ import {
     Modal,
     Alert,
     TextInput,
+    Linking,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../theme/ThemeContext';
+import Share from 'react-native-share';
 
 const API_BASE_URL = 'https://filter-server.vercel.app';
+
+interface ProductItem {
+    productId?: string;
+    name: string;
+    price?: number;
+    sellingPrice?: number;
+    quantity: number;
+    discount?: number;
+    total: number;
+}
 
 interface Order {
     _id: string;
@@ -23,18 +35,27 @@ interface Order {
     customerName: string;
     customerVatNo?: string;
     customerPhone?: string;
-    vehicleDetails: {
-        make: string;
-        model: string;
-        plate: string;
-        odometerReading?: string;
-    };
+    providerId?: string;
+    workshopName?: string;
+    workshopLogo?: string | null;
     technicianName: string;
     technicianId?: string;
-    totalAmount?: number;
-    status: string;
-    products?: any[];
+    vehicleDetails: {
+        make?: string;
+        model?: string;
+        year?: string;
+        plate?: string;
+        odometerReading?: string;
+    };
     serviceType: string;
+    products?: ProductItem[];
+    totalAmount?: number;
+    taxAmount?: number;
+    discountAmount?: number;
+    paymentStatus?: string;
+    status: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 interface CompletedOrdersScreenProps {
@@ -48,6 +69,9 @@ export function CompletedOrdersScreen({ navigation }: CompletedOrdersScreenProps
     const [isLoading, setIsLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [showOrderModal, setShowOrderModal] = useState(false);
+    const [showInvoiceSlip, setShowInvoiceSlip] = useState(false);
+    const [invoiceShareLoading, setInvoiceShareLoading] = useState(false);
+    const [saveInvoiceLoading, setSaveInvoiceLoading] = useState(false);
 
     // Edit Modal States
     const [showEditModal, setShowEditModal] = useState(false);
@@ -90,7 +114,8 @@ export function CompletedOrdersScreen({ navigation }: CompletedOrdersScreenProps
                 const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${providerId}`);
                 const result = await response.json();
                 if (result.success) {
-                    const completedOrders = result.data.filter((o: Order) => o.status === 'completed');
+                    const allOrders = result.orders || result.data || [];
+                    const completedOrders = allOrders.filter((o: Order) => o.status === 'completed' || o.status === 'delivered');
                     setOrders(completedOrders);
                 }
             }
@@ -144,6 +169,117 @@ export function CompletedOrdersScreen({ navigation }: CompletedOrdersScreenProps
                             if (result.success) fetchCompletedOrders();
                         } catch (error) {
                             Alert.alert('Error', 'Failed to delete order');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
+    const getInvoiceAsText = (order: Order): string => {
+        const lines: string[] = [];
+        lines.push('━━━━━━ INVOICE ━━━━━━');
+        lines.push(order.workshopName || 'Workshop');
+        lines.push('─────────────────────');
+        lines.push('Customer: ' + order.customerName);
+        if (order.customerPhone) lines.push('Phone: ' + order.customerPhone);
+        if (order.customerVatNo) lines.push('VAT: ' + order.customerVatNo);
+        lines.push('─────────────────────');
+        const v = order.vehicleDetails;
+        const vehicleStr = [v?.make, v?.model, v?.year].filter(Boolean).join(' ');
+        lines.push('Vehicle: ' + (vehicleStr || '-'));
+        lines.push('Plate: ' + (v?.plate || '-'));
+        if (v?.odometerReading) lines.push('Odometer: ' + v.odometerReading);
+        lines.push('─────────────────────');
+        lines.push('Service: ' + order.serviceType);
+        lines.push('Technician: ' + order.technicianName);
+        lines.push('─────────────────────');
+        lines.push('Products:');
+        if (order.products && order.products.length > 0) {
+            order.products.forEach(p => {
+                const total = p.total ?? (p.price != null ? p.price * p.quantity : 0);
+                lines.push(`  • ${p.name} x${p.quantity} = ${total.toFixed(2)} SAR`);
+            });
+        } else {
+            lines.push('  No products');
+        }
+        lines.push('─────────────────────');
+        if (order.discountAmount != null && order.discountAmount > 0) lines.push('Discount: -' + order.discountAmount.toFixed(2) + ' SAR');
+        if (order.taxAmount != null && order.taxAmount > 0) lines.push('Tax: ' + order.taxAmount.toFixed(2) + ' SAR');
+        lines.push('TOTAL: ' + (order.totalAmount?.toFixed(2) ?? '0.00') + ' SAR');
+        lines.push('─────────────────────');
+        lines.push('Payment: ' + (order.paymentStatus || 'pending').toUpperCase());
+        lines.push('Date: ' + (order.createdAt ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString()));
+        lines.push('Order #' + (order._id || '').slice(-8));
+        lines.push('━━━━━━━━━━━━━━━━━━━━');
+        return lines.join('\n');
+    };
+
+    const shareInvoice = async (openWhatsAppOnly: boolean) => {
+        if (!selectedOrder) return;
+        const message = getInvoiceAsText(selectedOrder);
+        try {
+            setInvoiceShareLoading(true);
+            if (openWhatsAppOnly) {
+                await Share.shareSingle({
+                    social: Share.Social.WHATSAPP,
+                    message: message,
+                    type: 'text/plain',
+                });
+            } else {
+                await Share.open({
+                    message: message,
+                    title: 'Invoice',
+                });
+            }
+        } catch (error: any) {
+            if (error?.message?.includes('User did not share') || error?.message?.includes('cancel')) return;
+            if (openWhatsAppOnly) Linking.openURL('https://wa.me/');
+            else Alert.alert('Error', 'Could not share.');
+        } finally {
+            setInvoiceShareLoading(false);
+        }
+    };
+
+    const openGenerateInvoice = () => {
+        setShowOrderModal(false);
+        setShowInvoiceSlip(true);
+    };
+
+    const saveToSalesInvoiceAndDeleteOrder = async () => {
+        if (!selectedOrder) return;
+        Alert.alert(
+            'Save Invoice & Remove Order',
+            'This will save the invoice to records and remove the order from completed list. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Save & Remove',
+                    onPress: async () => {
+                        try {
+                            setSaveInvoiceLoading(true);
+                            const orderPayload = typeof selectedOrder._id === 'string'
+                                ? selectedOrder
+                                : { ...selectedOrder, _id: (selectedOrder._id?.$oid ?? selectedOrder._id?.toString?.() ?? selectedOrder._id) };
+                            const response = await fetch(`${API_BASE_URL}/api/sales-invoice/save-and-complete`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ order: orderPayload })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                setShowInvoiceSlip(false);
+                                setSelectedOrder(null);
+                                fetchCompletedOrders();
+                                Alert.alert('Done', 'Invoice saved to records and order removed.');
+                            } else {
+                                Alert.alert('Error', result.message || 'Failed to save invoice');
+                            }
+                        } catch (error) {
+                            console.error('Save Sales Invoice Error:', error);
+                            Alert.alert('Error', 'Could not save invoice. Try again.');
+                        } finally {
+                            setSaveInvoiceLoading(false);
                         }
                     }
                 }
@@ -451,7 +587,7 @@ export function CompletedOrdersScreen({ navigation }: CompletedOrdersScreenProps
                 {renderPickerContent()}
             </Modal>
 
-            {/* Details Modal */}
+            {/* Details Modal - Completed Order: main action = Generate Invoice */}
             <Modal visible={showOrderModal} transparent animationType="fade" onRequestClose={() => setShowOrderModal(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.pickerContent, { backgroundColor: theme.cardBackground }]}>
@@ -462,15 +598,104 @@ export function CompletedOrdersScreen({ navigation }: CompletedOrdersScreenProps
                             </TouchableOpacity>
                         </View>
                         {selectedOrder && (
-                            <ScrollView>
-                                <View style={{ gap: 10 }}>
-                                    <Text style={{ color: theme.subText }}>CUSTOMER: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.customerName}</Text></Text>
-                                    <Text style={{ color: theme.subText }}>VEHICLE: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.vehicleDetails?.plate}</Text></Text>
-                                    <Text style={{ color: theme.subText }}>SERVICE: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.serviceType}</Text></Text>
-                                    <Text style={{ color: theme.subText }}>TECH: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.technicianName}</Text></Text>
-                                    {selectedOrder.totalAmount && <Text style={{ color: theme.subText }}>TOTAL: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.totalAmount.toFixed(2)} SAR</Text></Text>}
+                            <>
+                                <ScrollView>
+                                    <View style={{ gap: 10 }}>
+                                        <Text style={{ color: theme.subText }}>CUSTOMER: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.customerName}</Text></Text>
+                                        <Text style={{ color: theme.subText }}>VEHICLE: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.vehicleDetails?.plate}</Text></Text>
+                                        <Text style={{ color: theme.subText }}>SERVICE: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.serviceType}</Text></Text>
+                                        <Text style={{ color: theme.subText }}>TECH: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.technicianName}</Text></Text>
+                                        {selectedOrder.totalAmount != null && <Text style={{ color: theme.subText }}>TOTAL: <Text style={{ color: theme.text, fontWeight: 'bold' }}>{selectedOrder.totalAmount.toFixed(2)} SAR</Text></Text>}
+                                    </View>
+                                </ScrollView>
+                                <TouchableOpacity style={[styles.generateInvoiceBtn, { backgroundColor: '#F4C430' }]} onPress={openGenerateInvoice}>
+                                    <MaterialCommunityIcons name="file-document-outline" size={22} color="#1C1C1E" />
+                                    <Text style={[styles.generateInvoiceBtnText, { color: '#1C1C1E' }]}>Generate Invoice</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Invoice Slip Modal - full order info, Save & WhatsApp */}
+            <Modal visible={showInvoiceSlip} transparent animationType="slide" onRequestClose={() => setShowInvoiceSlip(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.invoiceModalContent, styles.invoiceModalContentFixed, { backgroundColor: theme.cardBackground }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: theme.text }]}>Invoice</Text>
+                            <TouchableOpacity onPress={() => setShowInvoiceSlip(false)}>
+                                <MaterialCommunityIcons name="close" size={24} color={theme.text} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView style={styles.invoiceScrollView} contentContainerStyle={styles.invoiceScrollContent} showsVerticalScrollIndicator={true}>
+                            {selectedOrder && (
+                                <View style={styles.invoiceShotWrap}>
+                                    <View style={[styles.invoiceSlip, { backgroundColor: '#fff', borderColor: theme.border }]}>
+                                        <Text style={styles.invoiceSlipTitle}>{selectedOrder.workshopName || 'Workshop'}</Text>
+                                        <View style={styles.invoiceDivider} />
+                                        <Text style={styles.invoiceLabel}>Customer</Text>
+                                        <Text style={styles.invoiceValue}>{selectedOrder.customerName}</Text>
+                                        {(selectedOrder.customerPhone != null && selectedOrder.customerPhone !== '') && <Text style={styles.invoiceValueSmall}>Phone: {selectedOrder.customerPhone}</Text>}
+                                        {(selectedOrder.customerVatNo != null && selectedOrder.customerVatNo !== '') && <Text style={styles.invoiceValueSmall}>VAT: {selectedOrder.customerVatNo}</Text>}
+                                        <View style={styles.invoiceDivider} />
+                                        <Text style={styles.invoiceLabel}>Vehicle</Text>
+                                        <Text style={styles.invoiceValue}>{[selectedOrder.vehicleDetails?.make, selectedOrder.vehicleDetails?.model, selectedOrder.vehicleDetails?.year].filter(Boolean).join(' ')}</Text>
+                                        <Text style={styles.invoiceValueSmall}>Plate: {selectedOrder.vehicleDetails?.plate || '-'}</Text>
+                                        {(selectedOrder.vehicleDetails?.odometerReading != null && selectedOrder.vehicleDetails.odometerReading !== '') && <Text style={styles.invoiceValueSmall}>Odometer: {selectedOrder.vehicleDetails.odometerReading}</Text>}
+                                        <View style={styles.invoiceDivider} />
+                                        <Text style={styles.invoiceLabel}>Service & Technician</Text>
+                                        <Text style={styles.invoiceValue}>{selectedOrder.serviceType}</Text>
+                                        <Text style={styles.invoiceValueSmall}>Technician: {selectedOrder.technicianName}</Text>
+                                        <View style={styles.invoiceDivider} />
+                                        <Text style={styles.invoiceLabel}>Products</Text>
+                                        {(selectedOrder.products && selectedOrder.products.length > 0) ? (
+                                            selectedOrder.products.map((p, i) => (
+                                                <View key={i} style={styles.invoiceProductRow}>
+                                                    <Text style={styles.invoiceProductName}>{p.name} x{p.quantity}</Text>
+                                                    <Text style={styles.invoiceProductTotal}>{p.total?.toFixed(2) ?? (p.price != null ? (p.price * p.quantity).toFixed(2) : '0.00')} SAR</Text>
+                                                </View>
+                                            ))
+                                        ) : (
+                                            <Text style={styles.invoiceValueSmall}>No products</Text>
+                                        )}
+                                        <View style={styles.invoiceDivider} />
+                                        {(selectedOrder.discountAmount != null && selectedOrder.discountAmount > 0) && (
+                                            <View style={styles.invoiceTotalRow}>
+                                                <Text style={styles.invoiceTotalLabel}>Discount</Text>
+                                                <Text style={styles.invoiceTotalValue}>-{selectedOrder.discountAmount.toFixed(2)} SAR</Text>
+                                            </View>
+                                        )}
+                                        {(selectedOrder.taxAmount != null && selectedOrder.taxAmount > 0) && (
+                                            <View style={styles.invoiceTotalRow}>
+                                                <Text style={styles.invoiceTotalLabel}>Tax</Text>
+                                                <Text style={styles.invoiceTotalValue}>{selectedOrder.taxAmount.toFixed(2)} SAR</Text>
+                                            </View>
+                                        )}
+                                        <View style={styles.invoiceTotalRow}>
+                                            <Text style={[styles.invoiceTotalLabel, { fontWeight: 'bold', fontSize: 16 }]}>Total</Text>
+                                            <Text style={[styles.invoiceTotalValue, { fontWeight: 'bold', fontSize: 16 }]}>{selectedOrder.totalAmount?.toFixed(2) ?? '0.00'} SAR</Text>
+                                        </View>
+                                        <View style={styles.invoiceDivider} />
+                                        <Text style={styles.invoiceValueSmall}>Payment: {(selectedOrder.paymentStatus || 'pending').toUpperCase()}</Text>
+                                        <Text style={styles.invoiceValueSmall}>Date: {selectedOrder.createdAt ? new Date(selectedOrder.createdAt).toLocaleString() : new Date().toLocaleString()}</Text>
+                                        <Text style={styles.invoiceValueSmall}>Order #{(selectedOrder._id || '').slice(-8)}</Text>
+                                    </View>
                                 </View>
-                            </ScrollView>
+                            )}
+                        </ScrollView>
+                        {selectedOrder && (
+                            <View style={styles.invoiceActions}>
+                                <TouchableOpacity style={[styles.invoiceActionBtn, styles.invoiceCheckBtn]} onPress={saveToSalesInvoiceAndDeleteOrder} disabled={saveInvoiceLoading}>
+                                    {saveInvoiceLoading ? <ActivityIndicator color="#fff" size="small" /> : <MaterialCommunityIcons name="check-circle" size={28} color="#fff" />}
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.invoiceActionBtn, { backgroundColor: '#25D366' }]} onPress={() => shareInvoice(true)} disabled={invoiceShareLoading}>
+                                    {invoiceShareLoading ? <ActivityIndicator color="#fff" size="small" /> : <MaterialCommunityIcons name="whatsapp" size={28} color="#fff" />}
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.invoiceActionBtn, { backgroundColor: '#F4C430' }]} onPress={() => shareInvoice(false)} disabled={invoiceShareLoading}>
+                                    {invoiceShareLoading ? <ActivityIndicator color="#1C1C1E" size="small" /> : <MaterialCommunityIcons name="share-variant" size={28} color="#1C1C1E" />}
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </View>
                 </View>
@@ -511,4 +736,26 @@ const styles = StyleSheet.create({
     divider: { height: 1.5, backgroundColor: 'rgba(0,0,0,0.05)', marginVertical: 10 },
     saveBtn: { backgroundColor: '#F4C430', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
     saveBtnText: { color: '#1C1C1E', fontWeight: 'bold', fontSize: 17 },
+    generateInvoiceBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, marginTop: 16, gap: 8 },
+    generateInvoiceBtnText: { fontSize: 16, fontWeight: 'bold' },
+    invoiceModalContent: { width: '95%', maxHeight: '90%', padding: 16, borderRadius: 16 },
+    invoiceModalContentFixed: { height: '85%', maxHeight: '90%' },
+    invoiceScrollView: { flex: 1, minHeight: 0 },
+    invoiceScrollContent: { paddingBottom: 20, flexGrow: 1 },
+    invoiceShotWrap: { alignSelf: 'stretch' },
+    invoiceSlip: { padding: 16, borderRadius: 12, borderWidth: 1 },
+    invoiceDivider: { height: 1, backgroundColor: 'rgba(0,0,0,0.1)', marginVertical: 8 },
+    invoiceSlipTitle: { fontSize: 18, fontWeight: 'bold', color: '#1C1C1E', textAlign: 'center', marginBottom: 8 },
+    invoiceLabel: { fontSize: 12, color: '#666', marginTop: 6, marginBottom: 2 },
+    invoiceValue: { fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
+    invoiceValueSmall: { fontSize: 13, color: '#444', marginTop: 2 },
+    invoiceProductRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
+    invoiceProductName: { fontSize: 14, color: '#1C1C1E', flex: 1 },
+    invoiceProductTotal: { fontSize: 14, color: '#1C1C1E', fontWeight: '600' },
+    invoiceTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 4 },
+    invoiceTotalLabel: { fontSize: 14, color: '#1C1C1E' },
+    invoiceTotalValue: { fontSize: 14, color: '#1C1C1E' },
+    invoiceActions: { flexDirection: 'row', gap: 10, marginTop: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.08)', flexWrap: 'wrap' },
+    invoiceActionBtn: { flex: 1, minWidth: 56, alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12 },
+    invoiceCheckBtn: { backgroundColor: '#22C55E' },
 });

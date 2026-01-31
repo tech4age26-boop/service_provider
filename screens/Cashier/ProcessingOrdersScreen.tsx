@@ -62,8 +62,9 @@ export function ProcessingOrdersScreen({ navigation }: ProcessingOrdersScreenPro
                 const result = await response.json();
                 if (result.success) {
                     // Filter for in-progress or active orders
-                    const processingOrders = result.data.filter((o: Order) =>
-                        o.status === 'in-progress' || o.status === 'active'
+                    const allOrders = result.orders || result.data || [];
+                    const processingOrders = allOrders.filter((o: Order) =>
+                        o.status === 'in-progress' || o.status === 'active' || o.status === 'processing' || o.status === 'started' || o.status === 'arrived'
                     );
                     setOrders(processingOrders);
                 }

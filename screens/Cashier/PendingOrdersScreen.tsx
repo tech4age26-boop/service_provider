@@ -61,7 +61,8 @@ export function PendingOrdersScreen({ navigation }: PendingOrdersScreenProps) {
                 const response = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${providerId}`);
                 const result = await response.json();
                 if (result.success) {
-                    const pendingOrders = result.data.filter((o: Order) => o.status === 'pending');
+                    const allOrders = result.orders || result.data || [];
+                    const pendingOrders = allOrders.filter((o: Order) => o.status === 'pending');
                     setOrders(pendingOrders);
                 }
             }

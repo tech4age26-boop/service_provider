@@ -58,7 +58,16 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
         { name: 'Add Employees', icon: 'account-multiple-plus-outline', color: '#9C27B0', permissions: [Permission.EMPLOYEE_CRUD], screen: 'Employees' },
         { name: 'Manage Expenses', icon: 'cash-multiple', color: '#F44336', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Expenses' },
         { name: 'Manage Categories', icon: 'tag-plus-outline', color: '#E91E63', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Category' },
+        { name: 'Manage Department', icon: 'office-building', color: '#607D8B', permissions: [Permission.PURCHASE_INVOICE_CRUD], screen: 'Department' },
     ];
+
+    const [totalCash, setTotalCash] = useState(0);
+    const [totalBank, setTotalBank] = useState(0);
+
+    // Dynamic Stats State
+    const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+    const [employeesCount, setEmployeesCount] = useState(0);
+    const [revenueToday, setRevenueToday] = useState(0);
 
     const filteredSidebarItems = SIDEBAR_ITEMS.filter(item =>
         item.permissions.some(p => hasPermission(p))
@@ -116,8 +125,24 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
             const eResponse = await fetch(`${API_BASE_URL}/api/expenses?providerId=${providerId}`);
             const eResult = await eResponse.json();
 
+            // Fetch Orders for accurate Cash/Bank Calculation
+            const oResponse = await fetch(`${API_BASE_URL}/api/provider-orders?providerId=${providerId}&limit=1000`);
+            const oResult = await oResponse.json();
+
+            // Fetch Employees Count
+            const empResponse = await fetch(`${API_BASE_URL}/api/employees?workshopId=${providerId}`);
+            const empResult = await empResponse.json();
+            if (empResult.success && empResult.data) {
+                setEmployeesCount(empResult.data.length);
+            }
+
             let totalDebt = 0;
             let totalPaid = 0;
+            let cash = 0;
+            let bank = 0;
+            let activeCount = 0;
+            let revToday = 0;
+            const todayStr = new Date().toISOString().split('T')[0];
 
             if (iResult.success) {
                 totalDebt = iResult.invoices.reduce((sum: number, inv: any) => sum + (inv.totalAmount || 0), 0);
@@ -129,7 +154,40 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
                     .reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0);
             }
 
+            // Calculate Cash vs Bank from Orders AND Active/Revenue Stats
+            if (oResult.success && oResult.orders) {
+                oResult.orders.forEach((order: any) => {
+                    const isCompleted = order.status === 'completed' || order.status === 'delivered';
+                    const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
+                    const amount = parseFloat(order.totalAmount || order.amount || 0);
+
+                    // 1. Active Orders Count
+                    if (!isCompleted && order.status !== 'cancelled') {
+                        activeCount++;
+                    }
+
+                    // 2. Revenue Today
+                    if (isCompleted && orderDate === todayStr) {
+                        revToday += amount;
+                    }
+
+                    // 3. Wallet/Bank Calculation (Total)
+                    if (isCompleted) {
+                        if (order.paymentMethod === 'Cash') {
+                            cash += amount;
+                        } else {
+                            // Assume everything else is Bank/Card
+                            bank += amount;
+                        }
+                    }
+                });
+            }
+
             setTotalInvoices(totalDebt - totalPaid);
+            setTotalCash(cash);
+            setTotalBank(bank);
+            setActiveOrdersCount(activeCount);
+            setRevenueToday(revToday);
         } catch (error) {
             console.error('Fetch Stats Error:', error);
         }
@@ -186,12 +244,12 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
                 <View style={styles.statsContainer}>
                     <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
                         <MaterialCommunityIcons name="clipboard-check" size={28} color="#F4C430" />
-                        <Text style={[styles.statNumber, { color: theme.text }]}>24</Text>
+                        <Text style={[styles.statNumber, { color: theme.text }]}>{activeOrdersCount}</Text>
                         <Text style={styles.statLabel}>{t('home.active_orders')}</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
                         <MaterialCommunityIcons name="account-group" size={28} color="#2ECC71" />
-                        <Text style={[styles.statNumber, { color: theme.text }]}>8</Text>
+                        <Text style={[styles.statNumber, { color: theme.text }]}>{employeesCount}</Text>
                         <Text style={styles.statLabel}>{t('home.employees')}</Text>
                     </View>
                 </View>
@@ -199,7 +257,7 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
                 <View style={styles.statsContainer}>
                     <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
                         <MaterialCommunityIcons name="cash" size={28} color="#007AFF" />
-                        <Text style={[styles.statNumber, { color: theme.text }]}>$3,240</Text>
+                        <Text style={[styles.statNumber, { color: theme.text }]}>{revenueToday.toFixed(0)}</Text>
                         <Text style={styles.statLabel}>{t('home.revenue_today')}</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: theme.cardBackground }]}>
@@ -209,35 +267,32 @@ export function ProviderHomeScreen({ onLogout }: ProviderHomeProps) {
                     </View>
                 </View>
 
-                {/* Recent Orders */}
+                {/* Financial Summary Cards (Cash & Bank) */}
                 <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('home.recent_orders')}</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.viewAll}>{t('common.view_all')}</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 15 }]}>{t('common.financial_summary')}</Text>
 
-                    <View style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
-                        <View style={styles.orderHeader}>
-                            <Text style={[styles.orderTitle, { color: theme.text }]}>Oil Change Service</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: '#FFF3CD' }]}>
-                                <Text style={[styles.statusText, { color: '#856404' }]}>{t('status.in_progress')}</Text>
+                    <View style={{ gap: 15 }}>
+                        {/* Cash Card */}
+                        <View style={[styles.financeCard, { backgroundColor: '#E8F5E9', borderColor: '#2ECC71' }]}>
+                            <View style={styles.financeIconCircle}>
+                                <MaterialCommunityIcons name="cash" size={30} color="#2ECC71" />
+                            </View>
+                            <View>
+                                <Text style={styles.financeLabel}>{t('common.cash_balance')}</Text>
+                                <Text style={[styles.financeValue, { color: '#1C1C1E' }]}>{totalCash.toFixed(2)} SAR</Text>
                             </View>
                         </View>
-                        <Text style={styles.orderCustomer}>Customer: John Smith</Text>
-                        <Text style={styles.orderTime}>Started 30 mins ago</Text>
-                    </View>
 
-                    <View style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
-                        <View style={styles.orderHeader}>
-                            <Text style={[styles.orderTitle, { color: theme.text }]}>Brake Repair</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: '#D1ECF1' }]}>
-                                <Text style={[styles.statusText, { color: '#0C5460' }]}>{t('status.pending')}</Text>
+                        {/* Bank Card */}
+                        <View style={[styles.financeCard, { backgroundColor: '#E3F2FD', borderColor: '#2196F3' }]}>
+                            <View style={[styles.financeIconCircle, { backgroundColor: '#BBDEFB' }]}>
+                                <MaterialCommunityIcons name="bank" size={30} color="#2196F3" />
+                            </View>
+                            <View>
+                                <Text style={styles.financeLabel}>{t('common.bank_balance')}</Text>
+                                <Text style={[styles.financeValue, { color: '#1C1C1E' }]}>{totalBank.toFixed(2)} SAR</Text>
                             </View>
                         </View>
-                        <Text style={styles.orderCustomer}>Customer: Sarah Johnson</Text>
-                        <Text style={styles.orderTime}>Scheduled for 2:00 PM</Text>
                     </View>
                 </View>
             </ScrollView>
@@ -561,20 +616,42 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#8E8E93',
     },
-    roleChip: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
-        marginRight: 8,
-    },
-    roleBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
     roleBadgeText: {
         fontSize: 10,
         fontWeight: 'bold',
         textTransform: 'uppercase',
+    },
+    financeCard: {
+        width: '100%',
+        padding: 20,
+        borderRadius: 16,
+        borderLeftWidth: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    financeIconCircle: {
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        backgroundColor: '#FFFFFF',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 20,
+    },
+    financeLabel: {
+        fontSize: 14,
+        color: '#555',
+        marginBottom: 5,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    financeValue: {
+        fontSize: 24,
+        fontWeight: 'bold',
     }
 });

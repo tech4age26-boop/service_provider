@@ -27,12 +27,33 @@ export function CategoryScreen({ navigation }: any) {
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCatName, setNewCatName] = useState('');
-    const [catType, setCatType] = useState<'product' | 'service'>('product');
+    const [catType, setCatType] = useState<'product' | 'service'>('service');
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [selectedDept, setSelectedDept] = useState<string | null>(null);
+    const [isDeptOpen, setIsDeptOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         fetchCategories();
+        fetchDepartments();
     }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            if (!userDataStr) return;
+            const userData = JSON.parse(userDataStr);
+            const providerId = userData.id || userData._id;
+
+            const response = await fetch(`${API_BASE_URL}/api/departments?providerId=${providerId}`);
+            const result = await response.json();
+            if (result.success) {
+                setDepartments(result.departments);
+            }
+        } catch (error) {
+            console.error('Fetch Departments Error:', error);
+        }
+    };
 
     const fetchCategories = async () => {
         try {
@@ -75,7 +96,8 @@ export function CategoryScreen({ navigation }: any) {
                 body: JSON.stringify({
                     providerId,
                     name: newCatName.trim(),
-                    type: catType,
+                    type: 'service',
+                    departmentId: selectedDept,
                 }),
             });
 
@@ -85,6 +107,8 @@ export function CategoryScreen({ navigation }: any) {
                 setCategories([result.category, ...categories]);
                 setShowAddModal(false);
                 setNewCatName('');
+                setSelectedDept(null);
+                setIsDeptOpen(false);
                 Alert.alert('Success', 'Category added');
             } else {
                 Alert.alert('Error', result.message || 'Failed to add category');
@@ -165,7 +189,6 @@ export function CategoryScreen({ navigation }: any) {
                                 </View>
                                 <View>
                                     <Text style={[styles.catName, { color: theme.text }]}>{cat.name}</Text>
-                                    <Text style={[styles.catTypeText, { color: theme.subText }]}>{cat.type === 'service' ? 'Service' : 'Product'}</Text>
                                 </View>
                             </View>
                             <TouchableOpacity onPress={() => handleDelete(cat._id, cat.name)}>
@@ -196,28 +219,35 @@ export function CategoryScreen({ navigation }: any) {
                             autoFocus
                         />
 
-                        <Text style={[styles.typeLabel, { color: theme.text }]}>Category Type:</Text>
-                        <View style={styles.typeSelector}>
-                            {(['product', 'service'] as const).map((t) => (
-                                <TouchableOpacity
-                                    key={t}
-                                    style={[
-                                        styles.typeBtn,
-                                        { borderColor: theme.border },
-                                        catType === t && { backgroundColor: theme.tint, borderColor: theme.tint }
-                                    ]}
-                                    onPress={() => setCatType(t)}
-                                >
-                                    <MaterialCommunityIcons
-                                        name={t === 'service' ? "wrench" : "package-variant"}
-                                        size={18}
-                                        color={catType === t ? '#000' : theme.subText}
-                                    />
-                                    <Text style={[styles.typeBtnText, { color: catType === t ? '#000' : theme.text }]}>
-                                        {t.charAt(0).toUpperCase() + t.slice(1)}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
+                        <View style={{ width: '100%', marginBottom: 20 }}>
+                            <Text style={[styles.typeLabel, { color: theme.text }]}>Select Department:</Text>
+                            <TouchableOpacity
+                                style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                onPress={() => setIsDeptOpen(!isDeptOpen)}>
+                                <Text style={{ color: selectedDept ? theme.text : theme.subText }}>
+                                    {departments.find(d => d._id === selectedDept)?.name || 'Select Department'}
+                                </Text>
+                                <MaterialCommunityIcons name={isDeptOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                            </TouchableOpacity>
+
+                            {isDeptOpen && (
+                                <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border, maxHeight: 150 }]}>
+                                    <ScrollView nestedScrollEnabled>
+                                        {departments.map((dept) => (
+                                            <TouchableOpacity
+                                                key={dept._id}
+                                                style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                onPress={() => {
+                                                    setSelectedDept(dept._id);
+                                                    setIsDeptOpen(false);
+                                                }}>
+                                                <Text style={{ color: theme.text }}>{dept.name}</Text>
+                                                {selectedDept === dept._id && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
                         </View>
 
 
@@ -300,4 +330,7 @@ const styles = StyleSheet.create({
     typeSelector: { flexDirection: 'row', gap: 12, width: '100%', marginBottom: 25 },
     typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10, borderWidth: 1, gap: 8 },
     typeBtnText: { fontSize: 14, fontWeight: '600' },
+    dropdownSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderRadius: 12, borderWidth: 1, marginBottom: 4 },
+    dropdownList: { borderRadius: 12, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
+    dropdownItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1 },
 });

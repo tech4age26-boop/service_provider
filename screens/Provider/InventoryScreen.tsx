@@ -66,8 +66,12 @@ export function InventoryScreen({ navigation }: any) {
         unitOfMeasurement: 'Unit',
         taxPercentage: '',
         serviceId: '', // Empty by default
+        departmentName: '', // Auto-filled
+        hasKmLimit: false,
+        kmLimit: '',
     });
     const [actualServices, setActualServices] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
 
     // Dropdown States
     const [openDropdown, setOpenDropdown] = useState<'service' | 'subcategory' | 'unit' | null>(null);
@@ -89,8 +93,8 @@ export function InventoryScreen({ navigation }: any) {
             const userData = JSON.parse(userDataStr);
             const providerId = userData.id || userData._id;
 
-            // Fetch Product Categories
-            const prodResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=product`);
+            // Fetch Service Categories (Now all our categories are services)
+            const prodResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${providerId}&type=service`);
             const prodResult = await prodResponse.json();
             if (prodResult.success) {
                 setCustomCategories(prodResult.categories);
@@ -104,6 +108,13 @@ export function InventoryScreen({ navigation }: any) {
                 setActualServices(servResult.data);
             } else {
                 setActualServices([]);
+            }
+
+            // Fetch Departments
+            const deptResponse = await fetch(`${API_BASE_URL}/api/departments?providerId=${providerId}`);
+            const deptResult = await deptResponse.json();
+            if (deptResult.success) {
+                setDepartments(deptResult.departments);
             }
         } catch (error) {
             console.error('Fetch Categories Error:', error);
@@ -138,8 +149,8 @@ export function InventoryScreen({ navigation }: any) {
             return;
         }
 
-        if (!formData.serviceId) {
-            Alert.alert('Error', 'Please select a service');
+        if (!formData.category) {
+            Alert.alert('Error', 'Please select a category');
             return;
         }
 
@@ -150,10 +161,16 @@ export function InventoryScreen({ navigation }: any) {
             const userData = JSON.parse(userDataStr);
             const providerId = userData.id || userData._id;
 
+            const payload = {
+                ...formData,
+                providerId,
+                kmLimit: (formData.hasKmLimit && formData.kmLimit) ? parseFloat(formData.kmLimit) : null
+            };
+
             const response = await fetch(`${API_BASE_URL}/api/inventory`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...formData, providerId }),
+                body: JSON.stringify(payload),
             });
 
             const result = await response.json();
@@ -172,7 +189,10 @@ export function InventoryScreen({ navigation }: any) {
                     connectedService: 'Filters',
                     status: 'active',
                     unitOfMeasurement: 'Unit',
-                    taxPercentage: ''
+                    taxPercentage: '',
+                    departmentName: '',
+                    hasKmLimit: false,
+                    kmLimit: ''
                 });
                 // Success alert removed as requested
             } else {
@@ -400,56 +420,40 @@ export function InventoryScreen({ navigation }: any) {
                             </View>
 
                             <View style={styles.formItem}>
-                                <Text style={[styles.label, { color: theme.text }]}>Service it belongs to (Connect to POS) *</Text>
+                                <Text style={[styles.label, { color: theme.text }]}>Category *</Text>
                                 <TouchableOpacity
                                     style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
-                                    onPress={() => setOpenDropdown(openDropdown === 'service' ? null : 'service')}
+                                    onPress={() => setOpenDropdown(openDropdown === 'subcategory' ? null : 'subcategory')}
                                 >
-                                    <Text style={{ color: formData.category ? theme.text : theme.subText }}>{formData.category || 'Select Your Service'}</Text>
-                                    <MaterialCommunityIcons name={openDropdown === 'service' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
+                                    <Text style={{ color: formData.category ? theme.text : theme.subText }}>{formData.category || 'Select Category'}</Text>
+                                    <MaterialCommunityIcons name={openDropdown === 'subcategory' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
                                 </TouchableOpacity>
-                                {openDropdown === 'service' && (
+                                {openDropdown === 'subcategory' && (
                                     <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                                        {actualServices.map((service) => (
+                                        {customCategories.map((cat) => (
                                             <DropdownItem
-                                                key={service._id}
-                                                label={service.name}
-                                                isSelected={formData.serviceId === service._id}
+                                                key={cat._id}
+                                                label={cat.name}
+                                                isSelected={formData.category === cat.name}
                                                 onPress={() => {
-                                                    setFormData({ ...formData, category: service.name, serviceId: service._id });
+                                                    const dept = departments.find(d => d._id === cat.departmentId);
+                                                    setFormData({
+                                                        ...formData,
+                                                        category: cat.name,
+                                                        departmentName: dept ? dept.name : ''
+                                                    });
                                                     setOpenDropdown(null);
                                                 }}
                                             />
                                         ))}
                                     </View>
                                 )}
-                            </View>
-
-                            <View style={styles.formItem}>
-                                <Text style={[styles.label, { color: theme.text }]}>Product Sub-Category (Internal)</Text>
-                                <TouchableOpacity
-                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
-                                    onPress={() => setOpenDropdown(openDropdown === 'subcategory' ? null : 'subcategory')}
-                                >
-                                    <Text style={{ color: theme.text }}>{formData.connectedService || 'Select Sub-Category'}</Text>
-                                    <MaterialCommunityIcons name={openDropdown === 'subcategory' ? "chevron-up" : "chevron-down"} size={20} color={theme.text} />
-                                </TouchableOpacity>
-                                {openDropdown === 'subcategory' && (
-                                    <View style={[styles.dropdownList, { backgroundColor: theme.cardBackground, borderColor: theme.border }]}>
-                                        {[
-                                            'Filters', 'Brake Pads', 'Fluids', 'Other',
-                                            ...customCategories.map(c => c.name)
-                                        ].map((cat) => (
-                                            <DropdownItem
-                                                key={cat}
-                                                label={cat}
-                                                isSelected={formData.connectedService === cat}
-                                                onPress={() => {
-                                                    setFormData({ ...formData, connectedService: cat });
-                                                    setOpenDropdown(null);
-                                                }}
-                                            />
-                                        ))}
+                                {formData.departmentName !== '' && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingHorizontal: 4 }}>
+                                        <MaterialCommunityIcons name="office-building" size={16} color={theme.tint} />
+                                        <Text style={{ color: theme.tint, marginLeft: 6, fontSize: 13, fontWeight: '600' }}>
+                                            Department: {formData.departmentName}
+                                        </Text>
                                     </View>
                                 )}
                             </View>
@@ -548,6 +552,37 @@ export function InventoryScreen({ navigation }: any) {
                                 </View>
                             </View>
 
+                            {/* KM Limit Section */}
+                            <View style={[styles.formItem, { marginBottom: 20 }]}>
+                                <TouchableOpacity
+                                    style={styles.checkboxRow}
+                                    onPress={() => setFormData({ ...formData, hasKmLimit: !formData.hasKmLimit })}
+                                    activeOpacity={0.7}
+                                >
+                                    <MaterialCommunityIcons
+                                        name={formData.hasKmLimit ? "checkbox-marked" : "checkbox-blank-outline"}
+                                        size={24}
+                                        color={formData.hasKmLimit ? '#F4C430' : theme.subText}
+                                    />
+                                    <Text style={[styles.checkboxLabel, { color: theme.text }]}>Set Kilometer (KMs) Limit</Text>
+                                </TouchableOpacity>
+
+                                {formData.hasKmLimit && (
+                                    <View style={{ marginTop: 12 }}>
+                                        <Text style={[styles.label, { color: theme.text }]}>Enter KMs Limit (e.g. 5000) *</Text>
+                                        <TextInput
+                                            style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                                            placeholder="e.g. 5000"
+                                            placeholderTextColor={theme.subText}
+                                            keyboardType="numeric"
+                                            value={formData.kmLimit}
+                                            onChangeText={(text) => setFormData({ ...formData, kmLimit: text })}
+                                            autoFocus
+                                        />
+                                    </View>
+                                )}
+                            </View>
+
                             <TouchableOpacity
                                 style={[styles.saveBtn, { backgroundColor: '#F4C430' }, isSaving && { opacity: 0.7 }]}
                                 onPress={handleSave}
@@ -563,7 +598,7 @@ export function InventoryScreen({ navigation }: any) {
                     </View>
                 </KeyboardAvoidingView>
             </Modal>
-        </View>
+        </View >
     );
 }
 
@@ -695,4 +730,6 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     emptyAddBtnText: { fontWeight: 'bold', color: '#1C1C1E' },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+    checkboxLabel: { fontSize: 14, fontWeight: '600' },
 });

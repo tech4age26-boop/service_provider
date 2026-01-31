@@ -7,12 +7,13 @@ import {
     StyleSheet,
     Text,
     View,
-    ScrollView,
-    TouchableOpacity,
     ActivityIndicator,
     Alert,
     Modal,
     TextInput,
+    FlatList,
+    RefreshControl,
+    TouchableOpacity,
 } from 'react-native';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,8 +31,8 @@ export function ProviderOrdersScreen() {
     const [orders, setOrders] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Date Range State
-    const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+    // Date Range State - Default to wide range
+    const [startDate, setStartDate] = useState('2024-01-01');
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
     // Stats State
@@ -41,91 +42,111 @@ export function ProviderOrdersScreen() {
         totalRevenue: 0
     });
 
-    // Mock Data for testing UI
-    const DUMMY_ORDERS = [
-        { _id: 'ord1', serviceType: 'Oil Change', status: 'pending', customerName: 'Ahmed Ali', vehicleDetails: { brand: 'Toyota', model: 'Camry' }, createdAt: new Date().toISOString(), amount: '0' },
-        { _id: 'ord2', serviceType: 'Brake Repair', status: 'in progress', customerName: 'Sami Khan', vehicleDetails: { brand: 'Honda', model: 'Accord' }, createdAt: new Date().toISOString(), amount: '0' },
-        { _id: 'ord3', serviceType: 'Tire Replacement', status: 'completed', customerName: 'John Doe', vehicleDetails: { brand: 'Ford', model: 'F-150' }, createdAt: new Date().toISOString(), amount: '250.00' },
-        { _id: 'ord4', serviceType: 'Engine Check', status: 'completed', customerName: 'Omar Farooq', vehicleDetails: { brand: 'Nissan', model: 'Altima' }, createdAt: new Date(Date.now() - 86400000).toISOString(), amount: '500.00' },
-
-        // Jan 1-15 Data (requested)
-        { _id: 'jan1', serviceType: 'Full Service', status: 'completed', customerName: 'Yousuf', vehicleDetails: { brand: 'GMC', model: 'Yukon' }, createdAt: '2026-01-02T10:00:00Z', amount: '850.00' },
-        { _id: 'jan2', serviceType: 'Oil Change', status: 'completed', customerName: 'Fahad', vehicleDetails: { brand: 'Hyundai', model: 'Elantra' }, createdAt: '2026-01-05T14:30:00Z', amount: '180.00' },
-        { _id: 'jan3', serviceType: 'Battery Replace', status: 'completed', customerName: 'Abdullah', vehicleDetails: { brand: 'Toyota', model: 'Land Cruiser' }, createdAt: '2026-01-10T09:15:00Z', amount: '450.00' },
-        { _id: 'jan4', serviceType: 'Gearbox Fix', status: 'completed', customerName: 'Saud', vehicleDetails: { brand: 'Mazda', model: 'CX-9' }, createdAt: '2026-01-12T16:00:00Z', amount: '1200.00' },
-        { _id: 'jan5', serviceType: 'AC Refill', status: 'completed', customerName: 'Mohammed', vehicleDetails: { brand: 'Kia', model: 'Optima' }, createdAt: '2026-01-14T11:45:00Z', amount: '150.00' },
-
-        { _id: 'ord5', serviceType: 'AC Repair', status: 'completed', customerName: 'Zaid Bakri', vehicleDetails: { brand: 'Lexus', model: 'ES' }, createdAt: new Date(Date.now() - 172800000).toISOString(), amount: '120.50' },
-        { _id: 'ord6', serviceType: 'Body Work', status: 'pending', customerName: 'Khalid Malik', vehicleDetails: { brand: 'BMW', model: 'X5' }, createdAt: new Date(new Date().getFullYear(), new Date().getMonth(), 5).toISOString(), amount: '0' },
-    ];
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
-        fetchOrders();
-    }, [startDate, endDate]);
+        resetAndFetch();
+    }, [startDate, endDate, activeTab]);
 
-    const fetchOrders = async () => {
-        setIsLoading(true);
-        // Simulate network delay
-        setTimeout(() => {
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
+    const resetAndFetch = () => {
+        setPage(1);
+        setOrders([]);
+        setHasMore(true);
+        fetchOrders(1);
+    };
 
-            const startStr = startDate;
-            const endStr = endDate;
+    const fetchOrders = async (pageNum: number) => {
+        if (pageNum === 1) setIsLoading(true);
+        else setLoadingMore(true);
 
-            const filteredData = DUMMY_ORDERS.filter(order => {
-                const isCompleted = order.status === 'completed' || order.status === 'delivered';
-                // Active orders are ALWAYS included
-                if (!isCompleted && order.status !== 'cancelled') return true;
+        try {
+            const userDataStr = await AsyncStorage.getItem('user_data');
+            if (userDataStr) {
+                const userData = JSON.parse(userDataStr);
+                const providerId = userData.workshopId || userData.id || userData._id;
 
-                // Completed orders must match date range
-                const orderDateStr = new Date(order.createdAt).toISOString().split('T')[0];
-                return orderDateStr >= startStr && orderDateStr <= endStr;
-            });
+                const queryStatus = activeTab === 'active' ? 'active' : 'completed';
+                // Widen status check to ensure we don't miss any 'active' variants
+                const statusParam = activeTab === 'active'
+                    ? 'pending,in progress,ready,accepted,assigned,arrived,started'
+                    : 'completed,delivered,cancelled';
 
-            setOrders(filteredData);
-            calculateStats(DUMMY_ORDERS);
+                const url = `${API_BASE_URL}/api/provider-orders?providerId=${providerId}&page=${pageNum}&limit=5&startDate=${startDate}&endDate=${endDate}&status=${encodeURIComponent(statusParam)}`;
+
+                const response = await fetch(url);
+                const result = await response.json();
+
+                if (result.success) {
+                    const newOrders = result.orders || [];
+
+                    if (pageNum === 1) {
+                        setOrders(newOrders);
+                    } else {
+                        setOrders(prev => [...prev, ...newOrders]);
+                    }
+
+                    // Check if we reached end
+                    if (newOrders.length < 5) {
+                        setHasMore(false);
+                    } else {
+                        setHasMore(true);
+                    }
+
+                    // Optional: If API returns totals, use them. Else calculate on current view (which is partial)
+                    // For now, let's roughly calculate stats on loaded orders + maybe some previous totals if available
+                    // or just show "Loaded" stats
+                    calculateStats(pageNum === 1 ? newOrders : [...orders, ...newOrders]);
+
+                } else {
+                    if (pageNum === 1) setOrders([]);
+                    setHasMore(false);
+                }
+            }
+        } catch (error) {
+            console.error('Fetch Orders Error:', error);
+            if (pageNum === 1) setOrders([]);
+        } finally {
             setIsLoading(false);
-        }, 500);
+            setLoadingMore(false);
+            setIsRefreshing(false);
+        }
+    };
+
+    const loadMore = () => {
+        if (!hasMore || isLoading || loadingMore) return;
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchOrders(nextPage);
+    };
+
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        resetAndFetch();
     };
 
     const calculateStats = (orderList: any[]) => {
-        const today = new Date().toISOString().split('T')[0];
-        const startStr = startDate;
-        const endStr = endDate;
-
+        // Simple calculation based on loaded orders
         let todayC = 0;
         let compC = 0;
         let revenue = 0;
+        const today = new Date().toISOString().split('T')[0];
 
         orderList.forEach(order => {
             const orderDateStr = new Date(order.createdAt).toISOString().split('T')[0];
-            const isCompleted = order.status === 'completed' || order.status === 'delivered';
-
-            // Today's count: Active orders from today
-            if (!isCompleted && orderDateStr === today && order.status !== 'cancelled') {
-                todayC++;
-            }
-
-            // Completed count and Revenue: Respect Date Filter
-            if (isCompleted && orderDateStr >= startStr && orderDateStr <= endStr) {
+            if (orderDateStr === today) todayC++;
+            if (order.status === 'completed' || order.status === 'delivered') {
                 compC++;
-                const numericAmount = parseFloat(order.amount) || 0;
-                revenue += numericAmount;
+                revenue += parseFloat(order.totalAmount || order.amount || 0);
             }
         });
-
         setStats({ todayCount: todayC, completedCount: compC, totalRevenue: revenue });
     };
 
-    const filteredOrders = orders.filter(order => {
-        if (activeTab === 'active') {
-            return order.status !== 'completed' && order.status !== 'delivered' && order.status !== 'cancelled';
-        } else {
-            return order.status === 'completed' || order.status === 'delivered';
-        }
-    });
+    // Orders are already filtered by API based on status param
+    const filteredOrders = orders;
 
     const [showCalendar, setShowCalendar] = useState<{ visible: boolean, type: 'start' | 'end' }>({ visible: false, type: 'start' });
     const [currentViewDate, setCurrentViewDate] = useState(new Date());
@@ -258,7 +279,7 @@ export function ProviderOrdersScreen() {
                         <Text style={{ color: theme.text }}>{endDate}</Text>
                     </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.filterBtn} onPress={fetchOrders}>
+                <TouchableOpacity style={styles.filterBtn} onPress={resetAndFetch}>
                     <MaterialCommunityIcons name="filter-variant" size={20} color="#1C1C1E" />
                 </TouchableOpacity>
             </View>
@@ -327,51 +348,65 @@ export function ProviderOrdersScreen() {
             </View>
 
             {/* Orders List */}
-            {isLoading ? (
-                <View style={{ flex: 1, justifyContent: 'center' }}>
-                    <ActivityIndicator size="large" color={theme.tint} />
-                </View>
-            ) : (
-                <ScrollView style={styles.content}>
-                    {filteredOrders.length === 0 ? (
+            <FlatList
+                style={styles.content}
+                data={orders}
+                keyExtractor={(item) => item._id || item.id}
+                renderItem={({ item: order }) => (
+                    <TouchableOpacity style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
+                        <View style={styles.orderHeader}>
+                            <View>
+                                <Text style={[styles.orderService, { color: theme.text }]}>{order.serviceType || order.items?.[0]?.name || 'Service'}</Text>
+                                <Text style={{ fontSize: 12, color: theme.subText }}>#{order._id?.slice(-6).toUpperCase()}</Text>
+                            </View>
+                            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
+                                <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>{order.status.toUpperCase()}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.orderRow}>
+                            <MaterialCommunityIcons name="account" size={16} color={theme.subText} />
+                            <Text style={[styles.orderCustomer, { color: theme.subText }]}>{order.customerName || order.customer?.name || 'Guest Customer'}</Text>
+                        </View>
+                        <View style={styles.orderRow}>
+                            <MaterialCommunityIcons name="car" size={16} color={theme.subText} />
+                            <Text style={[styles.orderCustomer, { color: theme.subText }]}>
+                                {order.vehicleDetails?.brand || order.vehicle?.brand} {order.vehicleDetails?.model || order.vehicle?.model}
+                            </Text>
+                        </View>
+                        <View style={styles.orderRow}>
+                            <MaterialCommunityIcons name="clock-outline" size={16} color={theme.subText} />
+                            <Text style={[styles.orderTime, { color: theme.subText }]}>
+                                {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                        </View>
+                        {activeTab === 'completed' && (
+                            <View style={[styles.orderActions, { borderTopColor: theme.border }]}>
+                                <Text style={[styles.orderAmount, { textAlign: 'right' }]}>{order.totalAmount || order.amount || '0.00'} SAR</Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                    !isLoading ? (
                         <View style={styles.emptyContainer}>
                             <MaterialCommunityIcons name="clipboard-text-outline" size={60} color={theme.border} />
                             <Text style={{ color: theme.subText, marginTop: 10 }}>No orders found for this period</Text>
                         </View>
-                    ) : (
-                        filteredOrders.map((order) => (
-                            <TouchableOpacity key={order._id || order.id} style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
-                                <View style={styles.orderHeader}>
-                                    <View>
-                                        <Text style={[styles.orderService, { color: theme.text }]}>{order.serviceType || 'Service'}</Text>
-                                        <Text style={{ fontSize: 12, color: theme.subText }}>#{order._id?.slice(-6).toUpperCase()}</Text>
-                                    </View>
-                                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
-                                        <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>{order.status.toUpperCase()}</Text>
-                                    </View>
-                                </View>
-                                <View style={styles.orderRow}>
-                                    <MaterialCommunityIcons name="account" size={16} color={theme.subText} />
-                                    <Text style={[styles.orderCustomer, { color: theme.subText }]}>{order.customerName || 'Guest Customer'}</Text>
-                                </View>
-                                <View style={styles.orderRow}>
-                                    <MaterialCommunityIcons name="car" size={16} color={theme.subText} />
-                                    <Text style={[styles.orderCustomer, { color: theme.subText }]}>{order.vehicleDetails?.brand} {order.vehicleDetails?.model}</Text>
-                                </View>
-                                <View style={styles.orderRow}>
-                                    <MaterialCommunityIcons name="clock-outline" size={16} color={theme.subText} />
-                                    <Text style={[styles.orderTime, { color: theme.subText }]}>{new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-                                </View>
-                                {activeTab === 'completed' && (
-                                    <View style={[styles.orderActions, { borderTopColor: theme.border }]}>
-                                        <Text style={[styles.orderAmount, { textAlign: 'right' }]}>{order.amount || '0.00'} SAR</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        ))
-                    )}
-                </ScrollView>
-            )}
+                    ) : null
+                }
+                ListFooterComponent={
+                    loadingMore ? (
+                        <View style={{ padding: 20 }}>
+                            <ActivityIndicator size="small" color={theme.tint} />
+                        </View>
+                    ) : <View style={{ height: 100 }} />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} colors={['#F4C430']} tintColor={theme.text} />
+                }
+            />
         </View>
     );
 }

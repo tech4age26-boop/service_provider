@@ -41,7 +41,8 @@ interface Employee {
     avatar?: string;
     employeeType: 'Technician' | 'Cashier' | 'Staff';
     specialization?: string; // e.g. 'Oil Change'
-    serviceId?: string; // Linked service ID
+    departmentId?: string; // Linked department ID
+    departmentName?: string; // Linked department Name
     permissions?: string[];
 }
 
@@ -138,10 +139,10 @@ export function ProviderEmployeesScreen() {
     const [workshopId, setWorkshopId] = useState('');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [expenses, setExpenses] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]); // Available services for technicians
+    const [departments, setDepartments] = useState<any[]>([]); // Available departments
     const [isLoading, setIsLoading] = useState(true);
     const [isRoleOpen, setIsRoleOpen] = useState(false);
-    const [isServiceOpen, setIsServiceOpen] = useState(false);
+    const [isDepartmentOpen, setIsDepartmentOpen] = useState(false);
 
     const [showAddModal, setShowAddModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -162,8 +163,10 @@ export function ProviderEmployeesScreen() {
         commission: '0',
         status: 'active',
         avatar: undefined,
+        employeeType: 'Staff',
         specialization: '',
-        serviceId: '',
+        departmentId: '',
+        departmentName: '',
     };
 
     const [newEmployee, setNewEmployee] = useState<Partial<Employee>>(initialFormState);
@@ -199,11 +202,11 @@ export function ProviderEmployeesScreen() {
                     setExpenses(expResult.expenses || []);
                 }
 
-                // Fetch Services (Categories) for dropdown
-                const servResponse = await fetch(`${API_BASE_URL}/api/inventory-categories?providerId=${wId}&type=service`);
-                const servResult = await servResponse.json();
-                if (servResult.success && servResult.categories) {
-                    setServices(servResult.categories);
+                // Fetch Departments (to link technicians to them)
+                const deptResponse = await fetch(`${API_BASE_URL}/api/departments?providerId=${wId}`);
+                const deptResult = await deptResponse.json();
+                if (deptResult.success) {
+                    setDepartments(deptResult.departments || deptResult.data || []);
                 }
             }
         } catch (error) {
@@ -243,7 +246,8 @@ export function ProviderEmployeesScreen() {
         if (!newEmployee.name) missingFields.push('Name');
         if (!newEmployee.number) missingFields.push('Phone Number');
         if (!isEditing && !newEmployee.password) missingFields.push('Password');
-        if (newEmployee.employeeType === 'Technician' && !newEmployee.specialization) missingFields.push('Specialization');
+        if (!newEmployee.employeeType) missingFields.push('Employee Role');
+        if (newEmployee.employeeType === 'Technician' && !newEmployee.departmentId) missingFields.push('Linked Department');
 
 
         // Salary Validation
@@ -287,6 +291,9 @@ export function ProviderEmployeesScreen() {
                 salary: newEmployee.salary?.toString(),
                 commission: newEmployee.commission?.toString(),
                 permissions: selectedPermissions,
+                departmentId: newEmployee.employeeType === 'Technician' ? newEmployee.departmentId : undefined,
+                departmentName: newEmployee.employeeType === 'Technician' ? departments.find(d => d._id === newEmployee.departmentId)?.name : undefined,
+                specialization: newEmployee.employeeType === 'Technician' ? (departments.find(d => d._id === newEmployee.departmentId)?.name || 'General') : undefined,
             };
 
             const response = await fetch(endpoint, {
@@ -538,6 +545,34 @@ export function ProviderEmployeesScreen() {
 
                             <FormInput label="Account Password" required={!isEditing} value={newEmployee.password} onChangeText={(text: string) => setNewEmployee({ ...newEmployee, password: text })} placeholder={isEditing ? "(Leave blank to keep current)" : "Enter login password"} theme={theme} />
 
+                            {/* Employee Role Selection */}
+                            <View style={{ marginBottom: 16 }}>
+                                <FormLabel text="Employee Role" required theme={theme} />
+                                <TouchableOpacity
+                                    style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
+                                    onPress={() => setIsRoleOpen(!isRoleOpen)}>
+                                    <Text style={{ color: newEmployee.employeeType ? theme.text : theme.subText }}>{newEmployee.employeeType || 'Select Role'}</Text>
+                                    <MaterialCommunityIcons name={isRoleOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                                </TouchableOpacity>
+
+                                {isRoleOpen && (
+                                    <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                                        {['Technician', 'Cashier', 'Staff'].map((role) => (
+                                            <TouchableOpacity
+                                                key={role}
+                                                style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
+                                                onPress={() => {
+                                                    setNewEmployee({ ...newEmployee, employeeType: role as any });
+                                                    setIsRoleOpen(false);
+                                                }}>
+                                                <Text style={{ color: theme.text }}>{role}</Text>
+                                                {newEmployee.employeeType === role && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+
                             {/* Permission Selection Selection (2-Column Grid) */}
                             <View style={{ marginBottom: 20 }}>
                                 <FormLabel text="Role Permissions" theme={theme} />
@@ -568,34 +603,41 @@ export function ProviderEmployeesScreen() {
                                 </View>
                             </View>
 
-                            {/* Service Dropdown (Only for Technicians) */}
+                            {/* Department Dropdown (Only for Technicians) */}
                             {newEmployee.employeeType === 'Technician' && (
                                 <View style={{ marginBottom: 16 }}>
-                                    <FormLabel text="Specialization (Service)" required theme={theme} />
+                                    <FormLabel text="Linked Department" required theme={theme} />
                                     <TouchableOpacity
                                         style={[styles.dropdownSelector, { backgroundColor: theme.background, borderColor: theme.border }]}
-                                        onPress={() => setIsServiceOpen(!isServiceOpen)}>
-                                        <Text style={{ color: newEmployee.specialization ? theme.text : theme.subText }}>{newEmployee.specialization || 'Select Service'}</Text>
-                                        <MaterialCommunityIcons name={isServiceOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
+                                        onPress={() => setIsDepartmentOpen(!isDepartmentOpen)}>
+                                        <Text style={{ color: newEmployee.departmentId ? theme.text : theme.subText }}>
+                                            {departments.find(d => d._id === newEmployee.departmentId)?.name || 'Select Department'}
+                                        </Text>
+                                        <MaterialCommunityIcons name={isDepartmentOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.subText} />
                                     </TouchableOpacity>
 
-                                    {isServiceOpen && (
+                                    {isDepartmentOpen && (
                                         <View style={[styles.dropdownList, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                                            {services.map((service) => (
+                                            {departments.map((dept) => (
                                                 <TouchableOpacity
-                                                    key={service._id}
+                                                    key={dept._id}
                                                     style={[styles.dropdownItem, { borderBottomColor: theme.border }]}
                                                     onPress={() => {
-                                                        setNewEmployee({ ...newEmployee, specialization: service.name, serviceId: service._id });
-                                                        setIsServiceOpen(false);
+                                                        setNewEmployee({
+                                                            ...newEmployee,
+                                                            departmentId: dept._id,
+                                                            departmentName: dept.name,
+                                                            specialization: dept.name
+                                                        });
+                                                        setIsDepartmentOpen(false);
                                                     }}>
-                                                    <Text style={{ color: theme.text }}>{service.name}</Text>
-                                                    {newEmployee.serviceId === service._id && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
+                                                    <Text style={{ color: theme.text }}>{dept.name}</Text>
+                                                    {newEmployee.departmentId === dept._id && <MaterialCommunityIcons name="check" size={16} color="#F4C430" />}
                                                 </TouchableOpacity>
                                             ))}
-                                            {services.length === 0 && (
+                                            {departments.length === 0 && (
                                                 <View style={{ padding: 10, alignItems: 'center' }}>
-                                                    <Text style={{ color: theme.subText }}>No services found. Add inventory first.</Text>
+                                                    <Text style={{ color: theme.subText }}>No departments found.</Text>
                                                 </View>
                                             )}
                                         </View>
@@ -675,7 +717,7 @@ export function ProviderEmployeesScreen() {
                                     </View>
                                     <DetailRow icon="badge-account-horizontal-outline" label="Role" value={selectedEmployee.employeeType} theme={theme} />
                                     {selectedEmployee.employeeType === 'Technician' && (
-                                        <DetailRow icon="tools" label="Specialization" value={selectedEmployee.specialization} theme={theme} />
+                                        <DetailRow icon="office-building" label="Linked Dept" value={selectedEmployee.departmentName || 'All'} theme={theme} />
                                     )}
 
                                     {selectedEmployee.permissions && selectedEmployee.permissions.length > 0 && (
